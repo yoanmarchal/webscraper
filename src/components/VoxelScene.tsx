@@ -88,6 +88,14 @@ function getExposedFaces(lookup: CellLookup, cell: GridCell): Array<'front' | 'b
   return faces;
 }
 
+// Détecte si un bloc est isolé (aucun voisin horizontal)
+function isIsolatedBlock(lookup: CellLookup, cell: GridCell): boolean {
+  return !hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z) &&
+         !hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z) &&
+         !hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1) &&
+         !hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
+}
+
 function CellMesh({
   cell,
   toWorldPosition,
@@ -98,11 +106,115 @@ function CellMesh({
   lookup: CellLookup;
 }) {
   const position = toWorldPosition(cell.x, cell.y, cell.z);
+  const isIsolated = isIsolatedBlock(lookup, cell);
 
   if (cell.type === 'ROOF') {
     const roofConfig = getRoofConfig(lookup, cell);
     const roofColor = cell.color ?? '#c85a3f';
     const roofColor2 = cell.color ?? '#b84731';
+    
+    // Toit de tour (bloc isolé) - créneaux simples et propres
+    if (isIsolated) {
+      return (
+        <group position={position}>
+          {/* Anneau de base formant le chemin de ronde - collé au bas du bloc */}
+          <mesh position={[0, -0.425, 0]} castShadow receiveShadow>
+            <RoundedBox args={[1.1, 0.15, 1.1]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color="#9d3425" roughness={0.92} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Murs pleins entre les créneaux - formant la base crénelée */}
+          {/* Mur face avant (Z+) */}
+          <mesh position={[0, -0.225, 0.5]} castShadow receiveShadow>
+            <RoundedBox args={[1.0, 0.2, 0.1]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          {/* Mur face arrière (Z-) */}
+          <mesh position={[0, -0.225, -0.5]} castShadow receiveShadow>
+            <RoundedBox args={[1.0, 0.2, 0.1]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          {/* Mur face gauche (X-) */}
+          <mesh position={[-0.5, -0.225, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.1, 0.2, 0.9]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          {/* Mur face droite (X+) */}
+          <mesh position={[0.5, -0.225, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.1, 0.2, 0.9]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* 8 créneaux (merlons) répartis régulièrement */}
+          {/* Coins */}
+          <mesh position={[-0.4, 0.025, -0.4]} castShadow receiveShadow>
+            <RoundedBox args={[0.25, 0.4, 0.25]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[0.4, 0.025, -0.4]} castShadow receiveShadow>
+            <RoundedBox args={[0.25, 0.4, 0.25]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[-0.4, 0.025, 0.4]} castShadow receiveShadow>
+            <RoundedBox args={[0.25, 0.4, 0.25]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[0.4, 0.025, 0.4]} castShadow receiveShadow>
+            <RoundedBox args={[0.25, 0.4, 0.25]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Créneaux sur les faces (centrés) */}
+          <mesh position={[0, 0.025, -0.5]} castShadow receiveShadow>
+            <RoundedBox args={[0.25, 0.4, 0.1]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor2} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[0, 0.025, 0.5]} castShadow receiveShadow>
+            <RoundedBox args={[0.25, 0.4, 0.1]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor2} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[-0.5, 0.025, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.1, 0.4, 0.25]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor2} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[0.5, 0.025, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.1, 0.4, 0.25]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor2} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Plateforme intérieure */}
+          <mesh position={[0, -0.325, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.55, 0.55, 0.08, 32]} />
+            <meshStandardMaterial color={roofColor2} roughness={0.9} />
+          </mesh>
+          
+          {/* Dôme conique au centre */}
+          <mesh position={[0, 0.175, 0]} castShadow receiveShadow>
+            <coneGeometry args={[0.35, 0.55, 8]} />
+            <meshStandardMaterial color="#7b241b" roughness={0.9} />
+          </mesh>
+          
+          {/* Sphère décorative dorée */}
+          <mesh position={[0, 0.505, 0]} castShadow receiveShadow>
+            <sphereGeometry args={[0.09, 16, 16]} />
+            <meshStandardMaterial color="#d4a04f" metalness={0.7} roughness={0.2} />
+          </mesh>
+        </group>
+      );
+    }
     
     // Toit de coin (forme en L)
     if (roofConfig.isCorner) {
@@ -328,6 +440,84 @@ function CellMesh({
     const windowVariant = (cell.x + cell.z) % 3;
     const exposedFaces = getExposedFaces(lookup, cell);
     
+    // Tour isolée - meurtrières au lieu de fenêtres
+    if (isIsolated) {
+      // Fonction pour créer une meurtrière selon la rotation
+      const createArrowSlit = (rotation: number, faceId: number) => {
+        return (
+          <group rotation={[0, rotation, 0]} key={`arrowslit-${faceId}`}>
+            {/* Meurtrière extérieure (large) */}
+            <mesh position={[0, 0.1, 0.505]} castShadow receiveShadow>
+              <RoundedBox args={[0.18, 0.55, 0.02]} radius={0.02} smoothness={4}>
+                <meshStandardMaterial color="#3a2a1a" roughness={0.95} />
+              </RoundedBox>
+            </mesh>
+            {/* Ouverture intérieure sombre */}
+            <mesh position={[0, 0.1, 0.48]} castShadow receiveShadow>
+              <RoundedBox args={[0.08, 0.48, 0.05]} radius={0.01} smoothness={4}>
+                <meshStandardMaterial color="#0a0a0a" roughness={0.98} />
+              </RoundedBox>
+            </mesh>
+            {/* Bord décoratif */}
+            <mesh position={[0, 0.1, 0.51]} castShadow>
+              <RoundedBox args={[0.22, 0.59, 0.01]} radius={0.03} smoothness={4}>
+                <meshStandardMaterial color="#5a4a3a" roughness={0.88} />
+              </RoundedBox>
+            </mesh>
+            
+            {/* Meurtrière inférieure (plus petite) */}
+            <mesh position={[0, -0.28, 0.505]} castShadow receiveShadow>
+              <RoundedBox args={[0.12, 0.18, 0.02]} radius={0.02} smoothness={4}>
+                <meshStandardMaterial color="#3a2a1a" roughness={0.95} />
+              </RoundedBox>
+            </mesh>
+            <mesh position={[0, -0.28, 0.48]} castShadow receiveShadow>
+              <RoundedBox args={[0.06, 0.12, 0.05]} radius={0.01} smoothness={4}>
+                <meshStandardMaterial color="#0a0a0a" roughness={0.98} />
+              </RoundedBox>
+            </mesh>
+          </group>
+        );
+      };
+      
+      return (
+        <group position={position}>
+          {/* Mur principal de la tour */}
+          <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
+            <meshStandardMaterial color={cell.color ?? '#d0baa0'} roughness={0.94} />
+          </RoundedBox>
+          
+          {/* Bandes horizontales décoratives */}
+          <mesh position={[0, 0.35, 0]}>
+            <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
+              <meshStandardMaterial color="#9a8a70" roughness={0.9} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[0, -0.35, 0]}>
+            <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
+              <meshStandardMaterial color="#9a8a70" roughness={0.9} />
+            </RoundedBox>
+          </mesh>
+
+          {/* Créer des meurtrières sur chaque face exposée */}
+          {exposedFaces.map((face, index) => {
+            switch (face) {
+              case 'front':
+                return createArrowSlit(0, index);
+              case 'back':
+                return createArrowSlit(Math.PI, index);
+              case 'left':
+                return createArrowSlit(-Math.PI / 2, index);
+              case 'right':
+                return createArrowSlit(Math.PI / 2, index);
+              default:
+                return null;
+            }
+          })}
+        </group>
+      );
+    }
+    
     // Fonction pour créer une fenêtre selon le type et la rotation
     const createWindow = (rotation: number, faceId: number) => {
       const variant = (windowVariant + faceId) % 3;
@@ -508,7 +698,72 @@ function CellMesh({
 
   const isFoundation = cell.type === 'FOUNDATION';
 
-  // Mur ou fondation
+  // Tour isolée - aspect de tour même pour les murs simples
+  if (isIsolated) {
+    return (
+      <group position={position}>
+        <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
+          <meshStandardMaterial color={cell.color ?? (isFoundation ? '#8d8a80' : '#c0b0a0')} roughness={0.94} />
+        </RoundedBox>
+        
+        {/* Bandes horizontales décoratives pour tour */}
+        <mesh position={[0, 0.35, 0]}>
+          <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
+            <meshStandardMaterial color={isFoundation ? '#6d6a60' : '#9a8a70'} roughness={0.9} />
+          </RoundedBox>
+        </mesh>
+        <mesh position={[0, -0.35, 0]}>
+          <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
+            <meshStandardMaterial color={isFoundation ? '#6d6a60' : '#9a8a70'} roughness={0.9} />
+          </RoundedBox>
+        </mesh>
+        
+        {/* Éléments décoratifs aux coins pour aspect de tour */}
+        {!isFoundation && (
+          <>
+            <mesh position={[-0.45, 0.1, -0.45]} castShadow>
+              <cylinderGeometry args={[0.08, 0.1, 0.8, 8]} />
+              <meshStandardMaterial color="#8a7a60" roughness={0.92} />
+            </mesh>
+            <mesh position={[0.45, 0.1, -0.45]} castShadow>
+              <cylinderGeometry args={[0.08, 0.1, 0.8, 8]} />
+              <meshStandardMaterial color="#8a7a60" roughness={0.92} />
+            </mesh>
+            <mesh position={[-0.45, 0.1, 0.45]} castShadow>
+              <cylinderGeometry args={[0.08, 0.1, 0.8, 8]} />
+              <meshStandardMaterial color="#8a7a60" roughness={0.92} />
+            </mesh>
+            <mesh position={[0.45, 0.1, 0.45]} castShadow>
+              <cylinderGeometry args={[0.08, 0.1, 0.8, 8]} />
+              <meshStandardMaterial color="#8a7a60" roughness={0.92} />
+            </mesh>
+          </>
+        )}
+        
+        {/* Fondation renforcée pour tour */}
+        {isFoundation && (
+          <>
+            {/* Base élargie */}
+            <mesh position={[0, -0.46, 0]}>
+              <RoundedBox args={[1.12, 0.06, 1.12]} radius={0.02} smoothness={4} castShadow receiveShadow>
+                <meshStandardMaterial color="#7d7a70" roughness={0.96} />
+              </RoundedBox>
+            </mesh>
+            
+            {/* Joints de pierre en cercle */}
+            {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle, i) => (
+              <mesh key={i} position={[Math.cos(angle) * 0.48, 0, Math.sin(angle) * 0.48]} rotation={[0, angle, 0]}>
+                <boxGeometry args={[0.02, 0.96, 0.05]} />
+                <meshStandardMaterial color="#6d6a60" roughness={0.95} />
+              </mesh>
+            ))}
+          </>
+        )}
+      </group>
+    );
+  }
+
+  // Mur ou fondation standard (non-tour)
   return (
     <group position={position}>
       <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
