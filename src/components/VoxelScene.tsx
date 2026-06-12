@@ -36,15 +36,33 @@ function hasOccupiedCell(lookup: CellLookup, x: number, y: number, z: number): b
   return getCell(lookup, x, y, z)?.isOccupied ?? false;
 }
 
-function getRoofAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
-  const eastWest = Number(hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z)) + Number(hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z));
-  const northSouth = Number(hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1)) + Number(hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1));
-
-  if (eastWest > northSouth) {
-    return 'x';
-  }
-
-  return 'z';
+// Détecte la configuration du toit et son orientation
+function getRoofConfig(lookup: CellLookup, cell: GridCell): {
+  axis: 'x' | 'z';
+  hasLeft: boolean;
+  hasRight: boolean;
+  hasFront: boolean;
+  hasBack: boolean;
+  isCorner: boolean;
+  isEnd: boolean;
+} {
+  const hasLeft = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
+  const hasRight = hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z);
+  const hasFront = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
+  const hasBack = hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1);
+  
+  const eastWest = Number(hasLeft) + Number(hasRight);
+  const northSouth = Number(hasFront) + Number(hasBack);
+  
+  // Détecte si c'est un coin (voisins perpendiculaires)
+  const isCorner = (eastWest === 1 && northSouth === 1);
+  
+  // Détecte si c'est une extrémité (voisin sur un seul côté)
+  const isEnd = (eastWest + northSouth === 1);
+  
+  const axis = eastWest > northSouth ? 'x' : 'z';
+  
+  return { axis, hasLeft, hasRight, hasFront, hasBack, isCorner, isEnd };
 }
 
 function getArchAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
@@ -82,40 +100,197 @@ function CellMesh({
   const position = toWorldPosition(cell.x, cell.y, cell.z);
 
   if (cell.type === 'ROOF') {
-    const roofAxis = getRoofAxis(lookup, cell);
-
+    const roofConfig = getRoofConfig(lookup, cell);
+    const roofColor = cell.color ?? '#c85a3f';
+    const roofColor2 = cell.color ?? '#b84731';
+    
+    // Toit de coin (forme en L)
+    if (roofConfig.isCorner) {
+      const rotation = 
+        roofConfig.hasLeft && roofConfig.hasFront ? Math.PI * 0.5 :
+        roofConfig.hasLeft && roofConfig.hasBack ? Math.PI :
+        roofConfig.hasRight && roofConfig.hasBack ? Math.PI * 1.5 :
+        0; // hasRight && hasFront
+      
+      return (
+        <group position={position} rotation={[0, rotation, 0]}>
+          {/* Structure de base sous le toit */}
+          <mesh position={[0, -0.42, 0]} castShadow receiveShadow>
+            <RoundedBox args={[1.0, 0.12, 1.0]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color="#9d3425" roughness={0.92} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Toit principal (côté droit) */}
+          <mesh rotation={[Math.PI / 4, 0, 0]} position={[0.2, 0.12, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.7, 0.14, 0.85]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh rotation={[-Math.PI / 4, 0, 0]} position={[0.2, 0.12, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.7, 0.14, 0.85]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor2} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Toit perpendiculaire (côté avant) */}
+          <mesh rotation={[0, 0, Math.PI / 4]} position={[0, 0.12, 0.2]} castShadow receiveShadow>
+            <RoundedBox args={[0.85, 0.14, 0.7]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh rotation={[0, 0, -Math.PI / 4]} position={[0, 0.12, 0.2]} castShadow receiveShadow>
+            <RoundedBox args={[0.85, 0.14, 0.7]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor2} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Faîtage */}
+          <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.6, 0.08, 0.08]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color="#7b241b" roughness={0.92} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[0, 0.4, 0]} rotation={[0, Math.PI / 2, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.6, 0.08, 0.08]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color="#7b241b" roughness={0.92} />
+            </RoundedBox>
+          </mesh>
+        </group>
+      );
+    }
+    
+    // Toit d'extrémité avec pignon
+    if (roofConfig.isEnd) {
+      const rotation = 
+        roofConfig.hasLeft ? Math.PI * 0.5 :
+        roofConfig.hasBack ? Math.PI :
+        roofConfig.hasRight ? Math.PI * 1.5 :
+        0; // hasFront
+      
+      return (
+        <group position={position} rotation={[0, rotation, 0]}>
+          {/* Structure de base sous le toit */}
+          <mesh position={[0, -0.42, 0]} castShadow receiveShadow>
+            <RoundedBox args={[1.0, 0.12, 1.0]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color="#9d3425" roughness={0.92} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Pignon (mur triangulaire à l'extrémité) */}
+          <mesh position={[0, 0.05, -0.48]} castShadow receiveShadow>
+            <boxGeometry args={[0.86, 0.7, 0.05]} />
+            <meshStandardMaterial color="#b8a890" roughness={0.94} />
+          </mesh>
+          
+          {/* Plans de toit inclinés */}
+          <mesh rotation={[Math.PI / 4, 0, 0]} position={[0, 0.15, 0]} castShadow receiveShadow>
+            <RoundedBox args={[1.1, 0.14, 0.8]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          <mesh rotation={[-Math.PI / 4, 0, 0]} position={[0, 0.15, 0]} castShadow receiveShadow>
+            <RoundedBox args={[1.1, 0.14, 0.8]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor2} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Faîtage (arête du toit) */}
+          <mesh position={[0, 0.42, 0]} castShadow receiveShadow>
+            <RoundedBox args={[1.16, 0.08, 0.1]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color="#7b241b" roughness={0.92} />
+            </RoundedBox>
+          </mesh>
+          
+          {/* Tuiles décoratives le long du faîtage */}
+          {[-0.3, -0.1, 0.1, 0.3].map((xOffset, i) => (
+            <mesh key={i} position={[xOffset, 0.46, 0]} castShadow>
+              <cylinderGeometry args={[0.04, 0.04, 0.12, 8]} />
+              <meshStandardMaterial color="#8b3424" roughness={0.9} />
+            </mesh>
+          ))}
+        </group>
+      );
+    }
+    
+    // Toit standard (simple faîte)
+    const roofAxis = roofConfig.axis;
+    
     return (
       <group position={position}>
+        {/* Structure de base sous le toit */}
+        <mesh position={[0, -0.42, 0]} castShadow receiveShadow>
+          <RoundedBox args={[1.0, 0.12, 1.0]} radius={0.02} smoothness={4}>
+            <meshStandardMaterial color="#9d3425" roughness={0.92} />
+          </RoundedBox>
+        </mesh>
+        
+        {/* Plans de toit inclinés */}
         <mesh
           rotation={roofAxis === 'x' ? [0, 0, Math.PI / 4] : [Math.PI / 4, 0, 0]}
-          position={[0, 0.1, 0]}
+          position={[0, 0.12, 0]}
           castShadow
           receiveShadow
         >
-          <RoundedBox args={[1.26, 0.14, 0.6]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={cell.color ?? '#b84731'} roughness={0.88} />
+          <RoundedBox args={[1.32, 0.14, 0.68]} radius={0.02} smoothness={4}>
+            <meshStandardMaterial color={roofColor} roughness={0.88} />
           </RoundedBox>
         </mesh>
         <mesh
           rotation={roofAxis === 'x' ? [0, 0, -Math.PI / 4] : [-Math.PI / 4, 0, 0]}
-          position={[0, 0.1, 0]}
+          position={[0, 0.12, 0]}
           castShadow
           receiveShadow
         >
-          <RoundedBox args={[1.26, 0.14, 0.6]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={cell.color ?? '#a93e2a'} roughness={0.88} />
+          <RoundedBox args={[1.32, 0.14, 0.68]} radius={0.02} smoothness={4}>
+            <meshStandardMaterial color={roofColor2} roughness={0.88} />
           </RoundedBox>
         </mesh>
-        <mesh position={[0, 0.38, 0]} castShadow receiveShadow>
-          <RoundedBox args={[1.2, 0.1, 0.14]} radius={0.02} smoothness={4}>
+        
+        {/* Faîtage (arête du toit) */}
+        <mesh 
+          position={[0, 0.4, 0]} 
+          rotation={roofAxis === 'x' ? [0, 0, 0] : [0, Math.PI / 2, 0]}
+          castShadow 
+          receiveShadow
+        >
+          <RoundedBox args={[1.36, 0.08, 0.12]} radius={0.02} smoothness={4}>
             <meshStandardMaterial color="#7b241b" roughness={0.92} />
           </RoundedBox>
         </mesh>
-        <mesh position={[0, -0.42, 0]} castShadow receiveShadow>
-          <RoundedBox args={[1.0, 0.12, 0.5]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color="#9d3425" roughness={0.92} />
-          </RoundedBox>
-        </mesh>
+        
+        {/* Tuiles décoratives le long du faîtage */}
+        {roofAxis === 'x' ? (
+          <>
+            <mesh position={[-0.35, 0.44, 0]} castShadow>
+              <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
+              <meshStandardMaterial color="#8b3424" roughness={0.9} />
+            </mesh>
+            <mesh position={[0, 0.44, 0]} castShadow>
+              <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
+              <meshStandardMaterial color="#8b3424" roughness={0.9} />
+            </mesh>
+            <mesh position={[0.35, 0.44, 0]} castShadow>
+              <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
+              <meshStandardMaterial color="#8b3424" roughness={0.9} />
+            </mesh>
+          </>
+        ) : (
+          <>
+            <mesh position={[0, 0.44, -0.35]} castShadow>
+              <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
+              <meshStandardMaterial color="#8b3424" roughness={0.9} />
+            </mesh>
+            <mesh position={[0, 0.44, 0]} castShadow>
+              <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
+              <meshStandardMaterial color="#8b3424" roughness={0.9} />
+            </mesh>
+            <mesh position={[0, 0.44, 0.35]} castShadow>
+              <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
+              <meshStandardMaterial color="#8b3424" roughness={0.9} />
+            </mesh>
+          </>
+        )}
       </group>
     );
   }
@@ -333,16 +508,61 @@ function CellMesh({
 
   const isFoundation = cell.type === 'FOUNDATION';
 
+  // Mur ou fondation
   return (
     <group position={position}>
       <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
         <meshStandardMaterial color={cell.color ?? '#b8b8b8'} roughness={0.94} />
       </RoundedBox>
-      <mesh position={[0, 0.32, 0.46]}>
-        <RoundedBox args={[0.94, 0.05, 0.05]} radius={0.01} smoothness={4}>
-          <meshStandardMaterial color="#d8c8ae" roughness={0.8} />
-        </RoundedBox>
-      </mesh>
+      
+      {/* Corniche horizontale sur les murs (pas sur les fondations) */}
+      {!isFoundation && (
+        <>
+          <mesh position={[0, 0.46, 0]}>
+            <RoundedBox args={[1.04, 0.06, 1.04]} radius={0.02} smoothness={4} castShadow receiveShadow>
+              <meshStandardMaterial color="#d8c8ae" roughness={0.86} />
+            </RoundedBox>
+          </mesh>
+          <mesh position={[0, 0.38, 0]}>
+            <RoundedBox args={[1.02, 0.04, 1.02]} radius={0.01} smoothness={4} castShadow>
+              <meshStandardMaterial color="#c8b89e" roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+        </>
+      )}
+      
+      {/* Détails de fondation en pierre */}
+      {isFoundation && (
+        <>
+          {/* Joints de pierre horizontaux */}
+          <mesh position={[0, 0.15, 0.505]}>
+            <boxGeometry args={[0.98, 0.02, 0.01]} />
+            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, -0.15, 0.505]}>
+            <boxGeometry args={[0.98, 0.02, 0.01]} />
+            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
+          </mesh>
+          <mesh position={[0.505, 0.15, 0]}>
+            <boxGeometry args={[0.01, 0.02, 0.98]} />
+            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
+          </mesh>
+          <mesh position={[0.505, -0.15, 0]}>
+            <boxGeometry args={[0.01, 0.02, 0.98]} />
+            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
+          </mesh>
+          
+          {/* Joints verticaux */}
+          <mesh position={[-0.25, 0, 0.505]}>
+            <boxGeometry args={[0.02, 0.96, 0.01]} />
+            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
+          </mesh>
+          <mesh position={[0.25, 0, 0.505]}>
+            <boxGeometry args={[0.02, 0.96, 0.01]} />
+            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
+          </mesh>
+        </>
+      )}
     </group>
   );
 }
