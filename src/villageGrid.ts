@@ -1,10 +1,12 @@
 import { BlockType, type CellCoordinate, type GridCell } from './types';
+import { type ColorPalette, getBuildingId, getPaletteByIndex, randomColorVariation } from './colorPalettes';
 
 export class VillageGrid {
   private readonly sizeX: number;
   private readonly sizeY: number;
   private readonly sizeZ: number;
   private readonly grid: GridCell[][][];
+  private readonly buildingPalettes: Map<number, ColorPalette> = new Map();
 
   constructor(sizeX: number, sizeY: number, sizeZ: number) {
     this.sizeX = sizeX;
@@ -242,27 +244,48 @@ export class VillageGrid {
             cell.type = BlockType.Wall;
           }
 
-          cell.color = this.getColorForType(cell.type);
+          cell.color = this.getColorForCell(cell);
         }
       }
     }
   }
 
-  private getColorForType(type: BlockType): string {
-    switch (type) {
-      case BlockType.Foundation:
-        return '#8d8a80';
-      case BlockType.Wall:
-        return '#c7b69e';
-      case BlockType.WallWithWindow:
-        return '#e0c996';
-      case BlockType.Roof:
-        return '#b84731';
-      case BlockType.Arch:
-        return '#9f8f7b';
-      default:
-        return '#b8b8b8';
+  private getBuildingPalette(x: number, z: number): ColorPalette {
+    const buildingId = getBuildingId(x, z, this.sizeX);
+    
+    if (!this.buildingPalettes.has(buildingId)) {
+      this.buildingPalettes.set(buildingId, getPaletteByIndex(buildingId));
     }
+    
+    return this.buildingPalettes.get(buildingId)!;
+  }
+
+  private getColorForCell(cell: GridCell): string {
+    const palette = this.getBuildingPalette(cell.x, cell.z);
+    let baseColor: string;
+
+    switch (cell.type) {
+      case BlockType.Foundation:
+        baseColor = palette.foundation;
+        break;
+      case BlockType.Wall:
+        baseColor = palette.primary;
+        break;
+      case BlockType.WallWithWindow:
+        baseColor = palette.accent;
+        break;
+      case BlockType.Roof:
+        baseColor = palette.roof;
+        break;
+      case BlockType.Arch:
+        baseColor = palette.primary;
+        break;
+      default:
+        baseColor = '#b8b8b8';
+    }
+
+    // Ajouter une légère variation aléatoire pour éviter l'uniformité
+    return randomColorVariation(baseColor, 0.06);
   }
 
   private getNeighborCell(x: number, y: number, z: number): GridCell | null {
