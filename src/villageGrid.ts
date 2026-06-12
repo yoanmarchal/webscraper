@@ -202,26 +202,42 @@ export class VillageGrid {
             continue;
           }
 
-          const cellBelow = this.isValidCoordinate(x, y - 1, z) ? this.grid[x][y - 1][z] : null;
-          const cellAbove = this.isValidCoordinate(x, y + 1, z) ? this.grid[x][y + 1][z] : null;
+          const cellBelow = this.getNeighborCell(x, y - 1, z);
+          const cellAbove = this.getNeighborCell(x, y + 1, z);
+          const cellLeft = this.getNeighborCell(x - 1, y, z);
+          const cellRight = this.getNeighborCell(x + 1, y, z);
+          const cellFront = this.getNeighborCell(x, y, z - 1);
+          const cellBack = this.getNeighborCell(x, y, z + 1);
 
-          const sameLevelNeighbors = [
-            this.isValidCoordinate(x + 1, y, z) ? this.grid[x + 1][y][z] : null,
-            this.isValidCoordinate(x - 1, y, z) ? this.grid[x - 1][y][z] : null,
-            this.isValidCoordinate(x, y, z + 1) ? this.grid[x][y][z + 1] : null,
-            this.isValidCoordinate(x, y, z - 1) ? this.grid[x][y][z - 1] : null,
-          ].filter((neighbor): neighbor is GridCell => neighbor !== null && neighbor.isOccupied);
+          const horizontalNeighbors = [cellLeft, cellRight, cellFront, cellBack].filter(
+            (neighbor): neighbor is GridCell => neighbor !== null && neighbor.isOccupied,
+          );
+
+          const horizontalNeighborCount = horizontalNeighbors.length;
+
+          const oppositePairs = [
+            cellLeft?.isOccupied && cellRight?.isOccupied ? 1 : 0,
+            cellFront?.isOccupied && cellBack?.isOccupied ? 1 : 0,
+          ].reduce((sum, value) => sum + value, 0);
+
+          const isTopMost = !cellAbove?.isOccupied;
+          const hasSupportBelow = cellBelow?.isOccupied ?? false;
 
           if (y === 0) {
             cell.type = BlockType.Foundation;
-          } else if (cellAbove?.isOccupied) {
-            cell.type = BlockType.Wall;
-          } else if (!cellBelow?.isOccupied && sameLevelNeighbors.length >= 2) {
+          } else if (!hasSupportBelow && isTopMost && horizontalNeighbors.length === 2 && oppositePairs === 1) {
             cell.type = BlockType.Arch;
-          } else if (!cellAbove?.isOccupied && cellBelow?.isOccupied) {
+          } else if (isTopMost && hasSupportBelow && horizontalNeighbors.length === 0) {
             cell.type = BlockType.Roof;
-          } else if (sameLevelNeighbors.length === 1) {
+          } else if (
+            isTopMost &&
+            hasSupportBelow &&
+            horizontalNeighborCount >= 1 &&
+            (horizontalNeighborCount <= 2 || oppositePairs === 0)
+          ) {
             cell.type = BlockType.WallWithWindow;
+          } else if (hasSupportBelow) {
+            cell.type = BlockType.Wall;
           } else {
             cell.type = BlockType.Wall;
           }
@@ -247,6 +263,14 @@ export class VillageGrid {
       default:
         return '#b8b8b8';
     }
+  }
+
+  private getNeighborCell(x: number, y: number, z: number): GridCell | null {
+    if (!this.isValidCoordinate(x, y, z)) {
+      return null;
+    }
+
+    return this.grid[x][y][z];
   }
 
   private isValidCoordinate(x: number, y: number, z: number): boolean {

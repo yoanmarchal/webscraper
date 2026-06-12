@@ -15,65 +15,193 @@ interface VoxelSceneProps {
   getTopOccupiedY: (x: number, z: number) => number | null;
 }
 
-function CellMesh({ cell, toWorldPosition }: { cell: GridCell; toWorldPosition: VoxelSceneProps['toWorldPosition'] }) {
+type CellLookup = Record<string, GridCell>;
+
+function cellKey(x: number, y: number, z: number): string {
+  return `${x}:${y}:${z}`;
+}
+
+function makeCellLookup(cells: GridCell[]): CellLookup {
+  return cells.reduce<CellLookup>((lookup, cell) => {
+    lookup[cellKey(cell.x, cell.y, cell.z)] = cell;
+    return lookup;
+  }, {});
+}
+
+function getCell(lookup: CellLookup, x: number, y: number, z: number): GridCell | null {
+  return lookup[cellKey(x, y, z)] ?? null;
+}
+
+function hasOccupiedCell(lookup: CellLookup, x: number, y: number, z: number): boolean {
+  return getCell(lookup, x, y, z)?.isOccupied ?? false;
+}
+
+function getRoofAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
+  const eastWest = Number(hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z)) + Number(hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z));
+  const northSouth = Number(hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1)) + Number(hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1));
+
+  if (eastWest > northSouth) {
+    return 'x';
+  }
+
+  return 'z';
+}
+
+function getArchAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
+  const eastWest = Number(hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z)) + Number(hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z));
+  const northSouth = Number(hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1)) + Number(hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1));
+
+  if (eastWest >= northSouth) {
+    return 'x';
+  }
+
+  return 'z';
+}
+
+function CellMesh({
+  cell,
+  toWorldPosition,
+  lookup,
+}: {
+  cell: GridCell;
+  toWorldPosition: VoxelSceneProps['toWorldPosition'];
+  lookup: CellLookup;
+}) {
   const position = toWorldPosition(cell.x, cell.y, cell.z);
 
   if (cell.type === 'ROOF') {
-    return (
-      <mesh position={position} castShadow receiveShadow>
-        <coneGeometry args={[0.45, 0.95, 4]} />
-        <meshStandardMaterial color={cell.color ?? '#b84731'} roughness={0.8} metalness={0.05} />
-      </mesh>
-    );
-  }
+    const roofAxis = getRoofAxis(lookup, cell);
 
-  if (cell.type === 'ARCH') {
     return (
       <group position={position}>
-        <mesh position={[-0.2, -0.1, 0]} castShadow receiveShadow>
-          <boxGeometry args={[0.18, 0.72, 0.18]} />
-          <meshStandardMaterial color={cell.color ?? '#9f8f7b'} roughness={0.85} />
+        <mesh
+          rotation={roofAxis === 'x' ? [0, 0, Math.PI / 4] : [Math.PI / 4, 0, 0]}
+          position={[0, 0.1, 0]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[1.26, 0.14, 0.6]} />
+          <meshStandardMaterial color={cell.color ?? '#b84731'} roughness={0.88} />
         </mesh>
-        <mesh position={[0.2, -0.1, 0]} castShadow receiveShadow>
-          <boxGeometry args={[0.18, 0.72, 0.18]} />
-          <meshStandardMaterial color={cell.color ?? '#9f8f7b'} roughness={0.85} />
+        <mesh
+          rotation={roofAxis === 'x' ? [0, 0, -Math.PI / 4] : [-Math.PI / 4, 0, 0]}
+          position={[0, 0.1, 0]}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[1.26, 0.14, 0.6]} />
+          <meshStandardMaterial color={cell.color ?? '#a93e2a'} roughness={0.88} />
         </mesh>
-        <mesh position={[0, 0.16, 0]} castShadow receiveShadow>
-          <boxGeometry args={[0.72, 0.18, 0.18]} />
-          <meshStandardMaterial color={cell.color ?? '#9f8f7b'} roughness={0.85} />
+        <mesh position={[0, 0.38, 0]} castShadow receiveShadow>
+          <boxGeometry args={[1.2, 0.1, 0.14]} />
+          <meshStandardMaterial color="#7b241b" roughness={0.92} />
+        </mesh>
+        <mesh position={[0, -0.42, 0]} castShadow receiveShadow>
+          <boxGeometry args={[1.0, 0.12, 0.5]} />
+          <meshStandardMaterial color="#9d3425" roughness={0.92} />
         </mesh>
       </group>
     );
   }
 
+  if (cell.type === 'ARCH') {
+    const archAxis = getArchAxis(lookup, cell);
+
+    return (
+      <group position={position} rotation={archAxis === 'z' ? [0, Math.PI / 2, 0] : [0, 0, 0]}>
+        <mesh position={archAxis === 'x' ? [-0.32, 0, 0] : [0, 0, -0.32]} castShadow receiveShadow>
+          <boxGeometry args={[archAxis === 'x' ? 0.28 : 0.3, 1.0, archAxis === 'x' ? 0.3 : 0.28]} />
+          <meshStandardMaterial color={cell.color ?? '#9f8f7b'} roughness={0.88} />
+        </mesh>
+        <mesh position={archAxis === 'x' ? [0.32, 0, 0] : [0, 0, 0.32]} castShadow receiveShadow>
+          <boxGeometry args={[archAxis === 'x' ? 0.28 : 0.3, 1.0, archAxis === 'x' ? 0.3 : 0.28]} />
+          <meshStandardMaterial color={cell.color ?? '#9f8f7b'} roughness={0.88} />
+        </mesh>
+        <mesh position={[0, 0.3, 0]} castShadow receiveShadow>
+          <torusGeometry args={[0.36, 0.1, 10, 24, Math.PI]} />
+          <meshStandardMaterial color={cell.color ?? '#9f8f7b'} roughness={0.82} />
+        </mesh>
+        <mesh position={[0, 0.46, 0]} castShadow receiveShadow>
+          <boxGeometry args={[1.0, 0.14, 0.26]} />
+          <meshStandardMaterial color={cell.color ?? '#8f7f6e'} roughness={0.88} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (cell.type === 'WALL_WINDOW') {
+    return (
+      <group position={position}>
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[1.0, 1.0, 1.0]} />
+          <meshStandardMaterial color={cell.color ?? '#e0c996'} roughness={0.94} />
+        </mesh>
+        <mesh position={[0, 0.04, 0.49]} castShadow receiveShadow>
+          <boxGeometry args={[0.3, 0.36, 0.04]} />
+          <meshStandardMaterial color="#101722" roughness={0.18} metalness={0.08} />
+        </mesh>
+        <mesh position={[0, 0.04, 0.475]} castShadow receiveShadow>
+          <boxGeometry args={[0.36, 0.4, 0.02]} />
+          <meshStandardMaterial color="#3f3320" roughness={0.85} />
+        </mesh>
+        <mesh position={[0, -0.14, 0.475]} castShadow receiveShadow>
+          <boxGeometry args={[0.4, 0.05, 0.02]} />
+          <meshStandardMaterial color="#816c45" roughness={0.82} />
+        </mesh>
+        <mesh position={[-0.16, -0.02, 0.475]} castShadow receiveShadow>
+          <boxGeometry args={[0.02, 0.34, 0.02]} />
+          <meshStandardMaterial color="#816c45" roughness={0.82} />
+        </mesh>
+        <mesh position={[0.16, -0.02, 0.475]} castShadow receiveShadow>
+          <boxGeometry args={[0.02, 0.34, 0.02]} />
+          <meshStandardMaterial color="#816c45" roughness={0.82} />
+        </mesh>
+        <mesh position={[0, -0.02, 0.49]} castShadow receiveShadow>
+          <boxGeometry args={[0.24, 0.24, 0.01]} />
+          <meshStandardMaterial color="#0a0f18" roughness={0.16} metalness={0.06} />
+        </mesh>
+      </group>
+    );
+  }
+
+  const isFoundation = cell.type === 'FOUNDATION';
+
   return (
     <mesh position={position} castShadow receiveShadow>
-      <boxGeometry args={[0.82, cell.type === 'FOUNDATION' ? 0.82 : 0.78, 0.82]} />
-      <meshStandardMaterial color={cell.color ?? '#b8b8b8'} roughness={0.92} />
-      {cell.type === 'WALL_WINDOW' ? (
-        <mesh position={[0, 0, 0.43]}>
-          <boxGeometry args={[0.24, 0.24, 0.04]} />
-          <meshStandardMaterial color="#2f435a" roughness={0.25} metalness={0.15} />
-        </mesh>
-      ) : null}
+      <boxGeometry args={[1.0, 1.0, 1.0]} />
+      <meshStandardMaterial color={cell.color ?? '#b8b8b8'} roughness={0.94} />
+      <mesh position={[0, 0.32, 0.46]}>
+        <boxGeometry args={[0.94, 0.05, 0.05]} />
+        <meshStandardMaterial color="#d8c8ae" roughness={0.8} />
+      </mesh>
     </mesh>
   );
 }
 
 function PlacementPreview({
   previewCell,
-  selectedHeight,
   toWorldPosition,
+  getNextPlacementY,
 }: {
   previewCell: { x: number; z: number } | null;
-  selectedHeight: number;
   toWorldPosition: VoxelSceneProps['toWorldPosition'];
+  getNextPlacementY?: VoxelSceneProps['getNextPlacementY'];
 }) {
   if (!previewCell) {
     return null;
   }
 
-  const position = toWorldPosition(previewCell.x, selectedHeight, previewCell.z);
+  if (!getNextPlacementY) {
+    return null;
+  }
+
+  const placementY = getNextPlacementY(previewCell.x, previewCell.z, 0);
+
+  if (placementY === null) {
+    return null;
+  }
+
+  const position = toWorldPosition(previewCell.x, placementY, previewCell.z);
 
   return (
     <mesh position={position}>
@@ -132,10 +260,17 @@ export function VoxelScene({
         <planeGeometry args={[gridWidth, gridDepth]} />
         <meshStandardMaterial color="#0c1726" transparent opacity={0.08} />
       </mesh>
-      {cells.map((cell) => (
-        <CellMesh key={`${cell.x}-${cell.y}-${cell.z}`} cell={cell} toWorldPosition={toWorldPosition} />
-      ))}
-      <PlacementPreview previewCell={previewCell} selectedHeight={selectedHeight} toWorldPosition={toWorldPosition} />
+      {(() => {
+        const lookup = makeCellLookup(cells);
+        return cells.map((cell) => (
+          <CellMesh key={`${cell.x}-${cell.y}-${cell.z}`} cell={cell} toWorldPosition={toWorldPosition} lookup={lookup} />
+        ));
+      })()}
+      <PlacementPreview
+        previewCell={previewCell}
+        toWorldPosition={toWorldPosition}
+        getNextPlacementY={getNextPlacementY}
+      />
       <OrbitControls enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI / 2.08} minDistance={6} maxDistance={36} />
     </Canvas>
   );
