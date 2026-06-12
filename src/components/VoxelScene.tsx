@@ -58,6 +58,18 @@ function getArchAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
   return 'z';
 }
 
+// Détecte les faces exposées d'un bloc (sans voisin adjacent)
+function getExposedFaces(lookup: CellLookup, cell: GridCell): Array<'front' | 'back' | 'left' | 'right'> {
+  const faces: Array<'front' | 'back' | 'left' | 'right'> = [];
+  
+  if (!hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1)) faces.push('front');  // Z+
+  if (!hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1)) faces.push('back');   // Z-
+  if (!hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z)) faces.push('left');   // X-
+  if (!hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z)) faces.push('right');  // X+
+  
+  return faces;
+}
+
 function CellMesh({
   cell,
   toWorldPosition,
@@ -139,6 +151,159 @@ function CellMesh({
   if (cell.type === 'WALL_WINDOW') {
     // Variation de fenêtre basée sur la position pour diversité
     const windowVariant = (cell.x + cell.z) % 3;
+    const exposedFaces = getExposedFaces(lookup, cell);
+    
+    // Fonction pour créer une fenêtre selon le type et la rotation
+    const createWindow = (rotation: number, faceId: number) => {
+      const variant = (windowVariant + faceId) % 3;
+      
+      return (
+        <group rotation={[0, rotation, 0]} key={`window-${faceId}`}>
+          {variant === 0 && (
+            // Grande fenêtre simple
+            <>
+              <mesh position={[0, 0.08, 0.505]} castShadow receiveShadow>
+                <RoundedBox args={[0.72, 0.68, 0.02]} radius={0.03} smoothness={4}>
+                  <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
+                </RoundedBox>
+              </mesh>
+              <mesh position={[0, 0.08, 0.495]} castShadow receiveShadow>
+                <RoundedBox args={[0.64, 0.6, 0.01]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial 
+                    color="#2a3a4a" 
+                    roughness={0.1} 
+                    metalness={0.15} 
+                    transparent 
+                    opacity={0.85}
+                  />
+                </RoundedBox>
+              </mesh>
+              <mesh position={[0, 0.08, 0.51]} castShadow>
+                <boxGeometry args={[0.68, 0.04, 0.01]} />
+                <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
+              </mesh>
+              <mesh position={[0, 0.08, 0.51]} castShadow>
+                <boxGeometry args={[0.04, 0.64, 0.01]} />
+                <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
+              </mesh>
+              <mesh position={[0, -0.28, 0.52]} castShadow receiveShadow>
+                <RoundedBox args={[0.78, 0.06, 0.08]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
+                </RoundedBox>
+              </mesh>
+            </>
+          )}
+
+          {variant === 1 && (
+            // Deux petites fenêtres côte à côte
+            <>
+              <mesh position={[-0.22, 0.08, 0.505]} castShadow receiveShadow>
+                <RoundedBox args={[0.32, 0.56, 0.02]} radius={0.03} smoothness={4}>
+                  <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
+                </RoundedBox>
+              </mesh>
+              <mesh position={[-0.22, 0.08, 0.495]} castShadow receiveShadow>
+                <RoundedBox args={[0.26, 0.48, 0.01]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial 
+                    color="#2a3a4a" 
+                    roughness={0.1} 
+                    metalness={0.15} 
+                    transparent 
+                    opacity={0.85}
+                  />
+                </RoundedBox>
+              </mesh>
+              <mesh position={[-0.22, 0.08, 0.51]} castShadow>
+                <boxGeometry args={[0.03, 0.52, 0.01]} />
+                <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
+              </mesh>
+              <mesh position={[0.22, 0.08, 0.505]} castShadow receiveShadow>
+                <RoundedBox args={[0.32, 0.56, 0.02]} radius={0.03} smoothness={4}>
+                  <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
+                </RoundedBox>
+              </mesh>
+              <mesh position={[0.22, 0.08, 0.495]} castShadow receiveShadow>
+                <RoundedBox args={[0.26, 0.48, 0.01]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial 
+                    color="#2a3a4a" 
+                    roughness={0.1} 
+                    metalness={0.15} 
+                    transparent 
+                    opacity={0.85}
+                  />
+                </RoundedBox>
+              </mesh>
+              <mesh position={[0.22, 0.08, 0.51]} castShadow>
+                <boxGeometry args={[0.03, 0.52, 0.01]} />
+                <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
+              </mesh>
+              <mesh position={[0, -0.22, 0.52]} castShadow receiveShadow>
+                <RoundedBox args={[0.78, 0.06, 0.08]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
+                </RoundedBox>
+              </mesh>
+            </>
+          )}
+
+          {variant === 2 && (
+            // Fenêtre avec volets
+            <>
+              <mesh position={[0, 0.08, 0.505]} castShadow receiveShadow>
+                <RoundedBox args={[0.58, 0.64, 0.02]} radius={0.03} smoothness={4}>
+                  <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
+                </RoundedBox>
+              </mesh>
+              <mesh position={[0, 0.08, 0.495]} castShadow receiveShadow>
+                <RoundedBox args={[0.5, 0.56, 0.01]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial 
+                    color="#2a3a4a" 
+                    roughness={0.1} 
+                    metalness={0.15} 
+                    transparent 
+                    opacity={0.85}
+                  />
+                </RoundedBox>
+              </mesh>
+              <mesh position={[0, 0.08, 0.51]} castShadow>
+                <boxGeometry args={[0.54, 0.03, 0.01]} />
+                <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
+              </mesh>
+              <mesh position={[0, 0.08, 0.51]} castShadow>
+                <boxGeometry args={[0.03, 0.6, 0.01]} />
+                <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
+              </mesh>
+              <mesh position={[-0.38, 0.08, 0.505]} rotation={[0, -0.15, 0]} castShadow receiveShadow>
+                <RoundedBox args={[0.16, 0.64, 0.03]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial color="#7a5a4a" roughness={0.9} />
+                </RoundedBox>
+              </mesh>
+              {[0.2, 0.08, -0.04, -0.16].map((yOffset, i) => (
+                <mesh key={`left-${i}`} position={[-0.38, 0.08 + yOffset, 0.51]} rotation={[0, -0.15, 0]} castShadow>
+                  <boxGeometry args={[0.14, 0.02, 0.01]} />
+                  <meshStandardMaterial color="#6a4a3a" roughness={0.92} />
+                </mesh>
+              ))}
+              <mesh position={[0.38, 0.08, 0.505]} rotation={[0, 0.15, 0]} castShadow receiveShadow>
+                <RoundedBox args={[0.16, 0.64, 0.03]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial color="#7a5a4a" roughness={0.9} />
+                </RoundedBox>
+              </mesh>
+              {[0.2, 0.08, -0.04, -0.16].map((yOffset, i) => (
+                <mesh key={`right-${i}`} position={[0.38, 0.08 + yOffset, 0.51]} rotation={[0, 0.15, 0]} castShadow>
+                  <boxGeometry args={[0.14, 0.02, 0.01]} />
+                  <meshStandardMaterial color="#6a4a3a" roughness={0.92} />
+                </mesh>
+              ))}
+              <mesh position={[0, -0.26, 0.52]} castShadow receiveShadow>
+                <RoundedBox args={[0.7, 0.06, 0.08]} radius={0.02} smoothness={4}>
+                  <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
+                </RoundedBox>
+              </mesh>
+            </>
+          )}
+        </group>
+      );
+    };
     
     return (
       <group position={position}>
@@ -147,173 +312,21 @@ function CellMesh({
           <meshStandardMaterial color={cell.color ?? '#e0c996'} roughness={0.94} />
         </RoundedBox>
 
-        {windowVariant === 0 && (
-          // Grande fenêtre simple
-          <>
-            {/* Cadre extérieur de la fenêtre */}
-            <mesh position={[0, 0.08, 0.505]} castShadow receiveShadow>
-              <RoundedBox args={[0.72, 0.68, 0.02]} radius={0.03} smoothness={4}>
-                <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
-              </RoundedBox>
-            </mesh>
-            {/* Verre de la fenêtre */}
-            <mesh position={[0, 0.08, 0.495]} castShadow receiveShadow>
-              <RoundedBox args={[0.64, 0.6, 0.01]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial 
-                  color="#2a3a4a" 
-                  roughness={0.1} 
-                  metalness={0.15} 
-                  transparent 
-                  opacity={0.85}
-                />
-              </RoundedBox>
-            </mesh>
-            {/* Croisillon horizontal */}
-            <mesh position={[0, 0.08, 0.51]} castShadow>
-              <boxGeometry args={[0.68, 0.04, 0.01]} />
-              <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
-            </mesh>
-            {/* Croisillon vertical */}
-            <mesh position={[0, 0.08, 0.51]} castShadow>
-              <boxGeometry args={[0.04, 0.64, 0.01]} />
-              <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
-            </mesh>
-            {/* Rebord de fenêtre */}
-            <mesh position={[0, -0.28, 0.52]} castShadow receiveShadow>
-              <RoundedBox args={[0.78, 0.06, 0.08]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
-              </RoundedBox>
-            </mesh>
-          </>
-        )}
-
-        {windowVariant === 1 && (
-          // Deux petites fenêtres côte à côte
-          <>
-            {/* Fenêtre gauche - Cadre */}
-            <mesh position={[-0.22, 0.08, 0.505]} castShadow receiveShadow>
-              <RoundedBox args={[0.32, 0.56, 0.02]} radius={0.03} smoothness={4}>
-                <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
-              </RoundedBox>
-            </mesh>
-            {/* Fenêtre gauche - Verre */}
-            <mesh position={[-0.22, 0.08, 0.495]} castShadow receiveShadow>
-              <RoundedBox args={[0.26, 0.48, 0.01]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial 
-                  color="#2a3a4a" 
-                  roughness={0.1} 
-                  metalness={0.15} 
-                  transparent 
-                  opacity={0.85}
-                />
-              </RoundedBox>
-            </mesh>
-            {/* Fenêtre gauche - Croisillon */}
-            <mesh position={[-0.22, 0.08, 0.51]} castShadow>
-              <boxGeometry args={[0.03, 0.52, 0.01]} />
-              <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
-            </mesh>
-
-            {/* Fenêtre droite - Cadre */}
-            <mesh position={[0.22, 0.08, 0.505]} castShadow receiveShadow>
-              <RoundedBox args={[0.32, 0.56, 0.02]} radius={0.03} smoothness={4}>
-                <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
-              </RoundedBox>
-            </mesh>
-            {/* Fenêtre droite - Verre */}
-            <mesh position={[0.22, 0.08, 0.495]} castShadow receiveShadow>
-              <RoundedBox args={[0.26, 0.48, 0.01]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial 
-                  color="#2a3a4a" 
-                  roughness={0.1} 
-                  metalness={0.15} 
-                  transparent 
-                  opacity={0.85}
-                />
-              </RoundedBox>
-            </mesh>
-            {/* Fenêtre droite - Croisillon */}
-            <mesh position={[0.22, 0.08, 0.51]} castShadow>
-              <boxGeometry args={[0.03, 0.52, 0.01]} />
-              <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
-            </mesh>
-
-            {/* Rebord de fenêtre commun */}
-            <mesh position={[0, -0.22, 0.52]} castShadow receiveShadow>
-              <RoundedBox args={[0.78, 0.06, 0.08]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
-              </RoundedBox>
-            </mesh>
-          </>
-        )}
-
-        {windowVariant === 2 && (
-          // Fenêtre avec volets
-          <>
-            {/* Cadre de la fenêtre */}
-            <mesh position={[0, 0.08, 0.505]} castShadow receiveShadow>
-              <RoundedBox args={[0.58, 0.64, 0.02]} radius={0.03} smoothness={4}>
-                <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
-              </RoundedBox>
-            </mesh>
-            {/* Verre de la fenêtre */}
-            <mesh position={[0, 0.08, 0.495]} castShadow receiveShadow>
-              <RoundedBox args={[0.5, 0.56, 0.01]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial 
-                  color="#2a3a4a" 
-                  roughness={0.1} 
-                  metalness={0.15} 
-                  transparent 
-                  opacity={0.85}
-                />
-              </RoundedBox>
-            </mesh>
-            {/* Croisillons */}
-            <mesh position={[0, 0.08, 0.51]} castShadow>
-              <boxGeometry args={[0.54, 0.03, 0.01]} />
-              <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
-            </mesh>
-            <mesh position={[0, 0.08, 0.51]} castShadow>
-              <boxGeometry args={[0.03, 0.6, 0.01]} />
-              <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
-            </mesh>
-
-            {/* Volet gauche */}
-            <mesh position={[-0.38, 0.08, 0.505]} rotation={[0, -0.15, 0]} castShadow receiveShadow>
-              <RoundedBox args={[0.16, 0.64, 0.03]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial color="#7a5a4a" roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-            {/* Lamelles volet gauche */}
-            {[0.2, 0.08, -0.04, -0.16].map((yOffset, i) => (
-              <mesh key={`left-${i}`} position={[-0.38, 0.08 + yOffset, 0.51]} rotation={[0, -0.15, 0]} castShadow>
-                <boxGeometry args={[0.14, 0.02, 0.01]} />
-                <meshStandardMaterial color="#6a4a3a" roughness={0.92} />
-              </mesh>
-            ))}
-
-            {/* Volet droit */}
-            <mesh position={[0.38, 0.08, 0.505]} rotation={[0, 0.15, 0]} castShadow receiveShadow>
-              <RoundedBox args={[0.16, 0.64, 0.03]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial color="#7a5a4a" roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-            {/* Lamelles volet droit */}
-            {[0.2, 0.08, -0.04, -0.16].map((yOffset, i) => (
-              <mesh key={`right-${i}`} position={[0.38, 0.08 + yOffset, 0.51]} rotation={[0, 0.15, 0]} castShadow>
-                <boxGeometry args={[0.14, 0.02, 0.01]} />
-                <meshStandardMaterial color="#6a4a3a" roughness={0.92} />
-              </mesh>
-            ))}
-
-            {/* Rebord de fenêtre */}
-            <mesh position={[0, -0.26, 0.52]} castShadow receiveShadow>
-              <RoundedBox args={[0.7, 0.06, 0.08]} radius={0.02} smoothness={4}>
-                <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
-              </RoundedBox>
-            </mesh>
-          </>
-        )}
+        {/* Créer des fenêtres sur chaque face exposée */}
+        {exposedFaces.map((face, index) => {
+          switch (face) {
+            case 'front':
+              return createWindow(0, index);           // Z+ (0°)
+            case 'back':
+              return createWindow(Math.PI, index);     // Z- (180°)
+            case 'left':
+              return createWindow(-Math.PI / 2, index); // X- (-90°)
+            case 'right':
+              return createWindow(Math.PI / 2, index);  // X+ (90°)
+            default:
+              return null;
+          }
+        })}
       </group>
     );
   }
