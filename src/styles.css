@@ -31,156 +31,22 @@ input {
 
 .app-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: minmax(280px, 360px) 1fr;
-  gap: 20px;
-  padding: 20px;
+  padding: 0;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 35%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 20%);
+    radial-gradient(circle at top left, rgba(73, 111, 139, 0.18), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(150, 89, 56, 0.12), transparent 30%),
+    #07111b;
 }
 
-.sidebar,
-.canvas-frame {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(8, 15, 25, 0.72);
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(16px);
-}
-
-.sidebar {
-  border-radius: 28px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 0.8rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #7cc1ff;
-}
-
-h1,
-h2 {
-  margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
-  letter-spacing: -0.03em;
-}
-
-h1 {
-  font-size: clamp(2rem, 4vw, 3.2rem);
-  line-height: 0.98;
-}
-
-h2 {
-  font-size: 1.1rem;
-}
-
-.lead {
-  margin: 0;
-  color: rgba(244, 239, 230, 0.78);
-  line-height: 1.6;
-}
-
-.control-card,
-.legend-card,
-.type-list {
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 16px;
-}
-
-.control-card {
-  display: grid;
-  gap: 10px;
-}
-
-.control-card label,
-.stats-grid span,
-.type-row span,
-.control-row span {
-  color: rgba(244, 239, 230, 0.64);
-  font-size: 0.88rem;
-}
-
-.control-card input[type='range'] {
-  width: 100%;
-  accent-color: #7cc1ff;
-}
-
-.control-row,
-.type-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.stats-grid div {
-  border-radius: 18px;
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.stats-grid strong,
-.control-row strong,
-.type-row strong {
-  display: block;
-  font-size: 1.4rem;
-  margin-top: 4px;
-  color: #ffffff;
-}
-
-.legend-card ul {
-  margin: 12px 0 0;
-  padding-left: 18px;
-  color: rgba(244, 239, 230, 0.78);
-  line-height: 1.7;
-}
-
-.type-list {
-  display: grid;
-  gap: 10px;
-}
-
-.ghost-button {
-  border: 1px solid rgba(124, 193, 255, 0.35);
-  background: linear-gradient(180deg, rgba(124, 193, 255, 0.18), rgba(124, 193, 255, 0.08));
-  color: #edf7ff;
-  border-radius: 999px;
-  padding: 14px 18px;
-  cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
-}
-
-.ghost-button:hover {
-  transform: translateY(-1px);
-  border-color: rgba(124, 193, 255, 0.6);
-}
-
-.stage {
-  min-width: 0;
-  display: flex;
+.compact-shell {
+  min-height: 100vh;
 }
 
 .canvas-frame {
-  flex: 1;
-  border-radius: 32px;
-  overflow: hidden;
   position: relative;
-  min-height: calc(100vh - 40px);
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .canvas-frame::before {
@@ -199,12 +65,35 @@ h2 {
   z-index: 0;
 }
 
+.floating-clear-button {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 5;
+  border: 1px solid rgba(124, 193, 255, 0.35);
+  background: rgba(8, 15, 25, 0.76);
+  color: #edf7ff;
+  border-radius: 999px;
+  padding: 12px 18px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.floating-clear-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(124, 193, 255, 0.6);
+  background: rgba(12, 20, 32, 0.86);
+}
+
 @media (max-width: 980px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    padding: 0;
   }
 
-  .canvas-frame {
-    min-height: 72vh;
+  .floating-clear-button {
+    top: 12px;
+    right: 12px;
   }
 }
