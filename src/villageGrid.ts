@@ -225,23 +225,29 @@ export class VillageGrid {
           const isTopMost = !cellAbove?.isOccupied;
           const hasSupportBelow = cellBelow?.isOccupied ?? false;
 
+          const hasTallerOppositeNeighbor =
+            (cellLeft?.isOccupied && this.getNeighborCell(x - 1, y + 1, z)?.isOccupied) ||
+            (cellRight?.isOccupied && this.getNeighborCell(x + 1, y + 1, z)?.isOccupied) ||
+            (cellFront?.isOccupied && this.getNeighborCell(x, y + 1, z - 1)?.isOccupied) ||
+            (cellBack?.isOccupied && this.getNeighborCell(x, y + 1, z + 1)?.isOccupied);
+
+          const isArch =
+            horizontalNeighbors.length === 2 &&
+            oppositePairs === 1 &&
+            (!hasSupportBelow || hasTallerOppositeNeighbor);
+
           if (y === 0) {
             cell.type = BlockType.Foundation;
-          } else if (hasSupportBelow && isTopMost && horizontalNeighbors.length === 2 && oppositePairs === 1) {
+          } else if (isArch) {
             cell.type = BlockType.Arch;
-          } else if (isTopMost && hasSupportBelow && horizontalNeighbors.length === 0) {
+          } else if (isTopMost) {
+            // Any topmost block of a column (not a foundation or arch) is a roof
             cell.type = BlockType.Roof;
-          } else if (
-            isTopMost &&
-            hasSupportBelow &&
-            horizontalNeighborCount >= 1 &&
-            horizontalNeighborCount <= 2 &&
-            oppositePairs === 0
-          ) {
+          } else if (horizontalNeighbors.length < 4) {
+            // Below the roof, visible facades (less than 4 neighbors) get windows
             cell.type = BlockType.WallWithWindow;
-          } else if (hasSupportBelow) {
-            cell.type = BlockType.Wall;
           } else {
+            // Fully enclosed interior blocks are solid walls
             cell.type = BlockType.Wall;
           }
 
