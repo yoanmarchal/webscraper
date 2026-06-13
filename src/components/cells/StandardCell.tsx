@@ -202,14 +202,6 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
                 <meshStandardMaterial color="#7d7a70" roughness={0.96} />
               </RoundedBox>
             </mesh>
-            
-            {/* Joints de pierre en cercle */}
-            {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle, i) => (
-              <mesh key={i} name={`foundationJoint${i}`} position={[Math.cos(angle) * 0.5, 0, Math.sin(angle) * 0.5]} rotation={[0, angle, 0]}>
-                <boxGeometry args={[0.02, 0.96, 0.05]} />
-                <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-              </mesh>
-            ))}
           </>
         )}
       </group>
@@ -223,14 +215,10 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
         <meshStandardMaterial color={cell.color ?? '#b8b8b8'} roughness={0.94} />
       </RoundedBox>
       
-      {/* Détails de murs : pierres d'angle, maçonnerie apparente et plinthes */}
-      {!isFoundation && (
-        <>
-          {renderQuoins()}
-          {renderStonePatches()}
-          {renderBaseTrim()}
-        </>
-      )}
+      {/* Détails de murs et fondations : pierres d'angle, maçonnerie apparente et plinthes */}
+      {renderQuoins()}
+      {renderStonePatches()}
+      {!isFoundation && renderBaseTrim()}
 
       {/* Corniche horizontale sur les murs (pas sur les fondations) */}
       {!isFoundation && (
@@ -251,42 +239,6 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       {/* Détails de fondation en pierre */}
       {isFoundation && (
         <>
-          {/* Joints de pierre horizontaux */}
-          <mesh name='foundationJointTop' position={[0, 0.15, 0.505]}>
-            <boxGeometry args={[0.98, 0.02, 0.01]} />
-            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-          </mesh>
-          <mesh name='foundationJointBottom' position={[0, -0.15, 0.505]}>
-            <boxGeometry args={[0.98, 0.02, 0.01]} />
-            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-          </mesh>
-          <mesh name='foundationJointRight' position={[0.505, 0.15, 0]}>
-            <boxGeometry args={[0.01, 0.02, 0.98]} />
-            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-          </mesh>
-          <mesh name='foundationJointRightBottom' position={[0.505, -0.15, 0]}>
-            <boxGeometry args={[0.01, 0.02, 0.98]} />
-            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-          </mesh>
-          
-          {/* Joints verticaux */}
-          <mesh name='foundationJointLeft' position={[-0.25, 0, 0.505]}>
-            <boxGeometry args={[0.02, 0.96, 0.01]} />
-            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-          </mesh>
-          <mesh name='foundationJointRight' position={[0.25, 0, 0.505]}>
-            <boxGeometry args={[0.02, 0.96, 0.01]} />
-            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-          </mesh>
-          <mesh name='foundationJointLeftBack' position={[-0.25, 0, -0.505]}>
-            <boxGeometry args={[0.02, 0.96, 0.01]} />
-            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-          </mesh>
-          <mesh name='foundationJointRightBack' position={[0.25, 0, -0.505]}>
-            <boxGeometry args={[0.02, 0.96, 0.01]} />
-            <meshStandardMaterial color="#6d6a60" roughness={0.95} />
-          </mesh>
-          
           {/* Base élargie de fondation */}
           <mesh name='foundationBase' position={[0, -0.48, 0]}>
             <RoundedBox args={[1.08, 0.02, 1.08]} radius={0.01} smoothness={4} castShadow receiveShadow>
