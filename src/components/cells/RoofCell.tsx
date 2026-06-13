@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { RoundedBox } from '@react-three/drei';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
@@ -11,449 +12,329 @@ interface RoofCellProps {
   isIsolated: boolean;
 }
 
+// ── Geometry constants (local cell space: Y=0 is cell center, ±0.5 = cell edges) ──
+const EAVE_Y    = -0.42;                                  // bottom of slope (eave)
+const RIDGE_Y   =  0.22;                                  // top of slope (ridge)
+const RISE      = RIDGE_Y - EAVE_Y;                       // 0.64
+const RUN       = 0.5;                                     // horizontal run = half cell width
+const SLOPE_LEN = Math.sqrt(RISE * RISE + RUN * RUN);     // ≈ 0.806
+const SLOPE_ANG = Math.atan2(RISE, RUN);                  // ≈ 51.9°  in radians
+const CENTER_Y  = (EAVE_Y + RIDGE_Y) / 2;               // −0.10 (mid-slope Y)
+const PANEL_LEN = 1.08;                                    // panel length along ridge (incl. overhang)
+const PANEL_T   = 0.055;                                   // panel thickness
+
+// ── Shared gable geometry (triangular prism) – created once ──────────────────
+function buildGableGeometry(): THREE.BufferGeometry {
+  const hw = 0.525; // half-width of gable base (slight overhang)
+  const hd = 0.035; // half-depth (gable wall thickness)
+
+  // Each face has its own vertex copies so computeVertexNormals() gives sharp edges.
+  const pos = new Float32Array([
+    // Front face (z = +hd)  →  verts 0,1,2
+    -hw, EAVE_Y,  hd,
+     hw, EAVE_Y,  hd,
+      0, RIDGE_Y, hd,
+    // Back face (z = -hd)   →  verts 3,4,5
+     hw, EAVE_Y,  -hd,
+    -hw, EAVE_Y,  -hd,
+      0, RIDGE_Y, -hd,
+    // Bottom face            →  verts 6,7,8,9
+    -hw, EAVE_Y,  hd,
+    -hw, EAVE_Y, -hd,
+     hw, EAVE_Y, -hd,
+     hw, EAVE_Y,  hd,
+    // Left slant face        →  verts 10,11,12,13
+    -hw, EAVE_Y,  hd,
+      0, RIDGE_Y, hd,
+      0, RIDGE_Y,-hd,
+    -hw, EAVE_Y, -hd,
+    // Right slant face       →  verts 14,15,16,17
+     hw, EAVE_Y,  hd,
+     hw, EAVE_Y, -hd,
+      0, RIDGE_Y,-hd,
+      0, RIDGE_Y, hd,
+  ]);
+
+  // Winding verified for correct per-face normals:
+  const idx = new Uint16Array([
+    0, 1, 2,                        // front   (normal: +Z)
+    3, 4, 5,                        // back    (normal: −Z)
+    6, 7, 8,   6, 8, 9,             // bottom  (normal: −Y)
+    10, 11, 12, 10, 12, 13,         // left slant  (normal: −X,+Y)
+    14, 15, 16, 14, 16, 17,         // right slant (normal: +X,+Y)
+  ]);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+let _gableGeo: THREE.BufferGeometry | null = null;
+const getGableGeo = () => {
+  if (!_gableGeo) _gableGeo = buildGableGeometry();
+  return _gableGeo;
+};
+
+// ── RoofCell ─────────────────────────────────────────────────────────────────
 export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) {
   const roofConfig = getRoofConfig(lookup, cell);
-  const roofColor = cell.color ?? '#c85a3f';
-  const roofColor2 = cell.color ?? '#b84731';
-  
-  const roofColorDark = varyColorBrightness(roofColor, -0.15);
+  const roofColor  = cell.color ?? '#c85a3f';
+  const colorDark  = varyColorBrightness(roofColor, -0.18);
+  const colorLight = varyColorBrightness(roofColor, 0.07);
 
-  const renderChimney = (offsetZ = 0.2) => {
-    // Placer une cheminée déterministe sur 33% des toits
+  // Rib Z offsets in panel-local space (4 tile rows along the ridge direction)
+  const RIB_OFFSETS: number[] = [-0.40, -0.13, 0.13, 0.40];
+
+  // ── Chimney (deterministic: ~33% of cells) ──
+  const renderChimney = () => {
     if ((cell.x + cell.z) % 3 !== 0) return null;
-    
-    // Choisir le côté gauche/droite selon les coordonnées
-    const sideX = (cell.x % 2 === 0) ? 0.26 : -0.26;
-    
+    const sideX = cell.x % 2 === 0 ? 0.14 : -0.14;
     return (
-      <group name="chimney" position={[sideX, 0.15, offsetZ]}>
-        {/* Corps de la cheminée en pierre */}
-        <mesh name="chimneyBody" castShadow receiveShadow>
-          <RoundedBox args={[0.16, 0.55, 0.16]} radius={0.015} smoothness={2}>
-            <meshStandardMaterial color="#9f8f7b" roughness={0.9} />
-          </RoundedBox>
+      <group name="chimney" position={[sideX, RIDGE_Y - 0.06, 0.06]}>
+        {/* Stone body */}
+        <mesh castShadow receiveShadow>
+          <boxGeometry args={[0.14, 0.46, 0.14]} />
+          <meshStandardMaterial color="#a09080" roughness={0.93} />
         </mesh>
-        {/* Chapeau de cheminée */}
-        <mesh name="chimneyCap" position={[0, 0.28, 0]} castShadow>
-          <RoundedBox args={[0.20, 0.04, 0.20]} radius={0.01} smoothness={2}>
-            <meshStandardMaterial color="#7a6a5a" roughness={0.9} />
-          </RoundedBox>
+        {/* Stone cap */}
+        <mesh castShadow position={[0, 0.25, 0]}>
+          <boxGeometry args={[0.19, 0.04, 0.19]} />
+          <meshStandardMaterial color="#7a6a5a" roughness={0.91} />
         </mesh>
-        {/* Pot de cheminée en terre cuite */}
-        <mesh name="chimneyPot" position={[0, 0.34, 0]} castShadow>
-          <cylinderGeometry args={[0.035, 0.04, 0.08, 8]} />
-          <meshStandardMaterial color="#a05a42" roughness={0.8} />
+        {/* Terracotta pot */}
+        <mesh castShadow position={[0, 0.31, 0]}>
+          <cylinderGeometry args={[0.034, 0.042, 0.09, 8]} />
+          <meshStandardMaterial color="#a05a42" roughness={0.82} />
         </mesh>
       </group>
     );
   };
-  
-  // Toit de tour (bloc isolé) - créneaux raffinés
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CASE 1 — Isolated tower (battlements + conical spire)
+  // ════════════════════════════════════════════════════════════════════════════
   if (isIsolated) {
+    const CORNERS: [number, number][] = [[-0.38, -0.38], [0.38, -0.38], [-0.38, 0.38], [0.38, 0.38]];
+    const FACES:   [number, number][] = [[0, -0.50], [0, 0.50], [-0.50, 0], [0.50, 0]];
     return (
       <group name="roofCell" position={position}>
-        {/* Anneau de base formant le chemin de ronde - collé au bas du bloc */}
-        <mesh name="baseRing" position={[0, -0.425, 0]} castShadow receiveShadow>
-          <RoundedBox args={[1.15, 0.15, 1.15]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color="#9d3425" roughness={0.92} />
+        {/* Battlement ledge */}
+        <mesh castShadow receiveShadow position={[0, -0.40, 0]}>
+          <RoundedBox args={[1.10, 0.12, 1.10]} radius={0.02} smoothness={4}>
+            <meshStandardMaterial color={colorDark} roughness={0.93} />
           </RoundedBox>
         </mesh>
-        
-        {/* Mur crénelé continu formant un anneau unique */}
-        <mesh name="crenelledWall" position={[0, -0.2, 0]} castShadow receiveShadow rotation={[0, Math.PI / 8, 0]}>
-          <cylinderGeometry args={[0.54, 0.54, 0.25, 8, 1, false]} />
-          <meshStandardMaterial color={roofColor} roughness={0.88} />
-        </mesh>
-        
-        {/* Mur extérieur pour créer l'épaisseur */}
-        <mesh name="outerWall" position={[0, -0.2, 0]} castShadow receiveShadow rotation={[0, Math.PI / 8, 0]}>
-          <cylinderGeometry args={[0.46, 0.46, 0.25, 8, 1, false]} />
-          <meshStandardMaterial color={roofColor} roughness={0.88} />
-        </mesh>
-        
-        {/* 8 créneaux (merlons) plus imposants */}
-        {/* Coins - plus larges et plus hauts */}
-        <mesh name="cornerMerlon1" position={[-0.4, 0.1, -0.4]} castShadow receiveShadow>
-          <RoundedBox args={[0.32, 0.55, 0.32]} radius={0.04} smoothness={4}>
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        <mesh name="cornerMerlon2" position={[0.4, 0.1, -0.4]} castShadow receiveShadow>
-          <RoundedBox args={[0.32, 0.55, 0.32]} radius={0.04} smoothness={4}>
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        <mesh name="cornerMerlon3" position={[-0.4, 0.1, 0.4]} castShadow receiveShadow>
-          <RoundedBox args={[0.32, 0.55, 0.32]} radius={0.04} smoothness={4}>
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        <mesh name="cornerMerlon4" position={[0.4, 0.1, 0.4]} castShadow receiveShadow>
-          <RoundedBox args={[0.32, 0.55, 0.32]} radius={0.04} smoothness={4}>
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Créneaux sur les faces - plus larges */}
-        <mesh name="faceMerlon1" position={[0, 0.05, -0.52]} castShadow receiveShadow>
-          <RoundedBox args={[0.35, 0.45, 0.12]} radius={0.04} smoothness={4}>
-            <meshStandardMaterial color={roofColor2} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        <mesh name="faceMerlon2" position={[0, 0.05, 0.52]} castShadow receiveShadow>
-          <RoundedBox args={[0.35, 0.45, 0.12]} radius={0.04} smoothness={4}>
-            <meshStandardMaterial color={roofColor2} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        <mesh name="faceMerlon3" position={[-0.52, 0.05, 0]} castShadow receiveShadow>
-          <RoundedBox args={[0.12, 0.45, 0.35]} radius={0.04} smoothness={4}>
-            <meshStandardMaterial color={roofColor2} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        <mesh name="faceMerlon4" position={[0.52, 0.05, 0]} castShadow receiveShadow>
-          <RoundedBox args={[0.12, 0.45, 0.35]} radius={0.04} smoothness={4}>
-            <meshStandardMaterial color={roofColor2} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Plateforme intérieure */}
-        <mesh name="innerPlatform" position={[0, -0.31, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.58, 0.58, 0.1, 32]} />
-          <meshStandardMaterial color={roofColor2} roughness={0.9} />
-        </mesh>
-        
-        {/* Toit conique amélioré avec tuiles apparentes */}
-        {/* Base du toit avec bordure */}
-        <mesh name="roofBase" position={[0, 0.15, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.42, 0.48, 0.1, 8]} />
-          <meshStandardMaterial color={roofColor} roughness={0.88} />
-        </mesh>
-        
-        {/* Dôme conique principal plus élancé */}
-        <mesh name="roofDome" position={[0, 0.32, 0]} castShadow receiveShadow>
-          <coneGeometry args={[0.38, 0.7, 8]} />
-          <meshStandardMaterial color="#7b241b" roughness={0.85} />
-        </mesh>
-        
-        {/* Segments de tuiles (anneaux décoratifs) */}
-        <mesh name="tileSegment1" position={[0, 0.25, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.35, 0.36, 0.04, 8]} />
-          <meshStandardMaterial color="#8b2a1f" roughness={0.9} />
-        </mesh>
-        <mesh name="tileSegment2" position={[0, 0.4, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.25, 0.26, 0.04, 8]} />
-          <meshStandardMaterial color="#8b2a1f" roughness={0.9} />
-        </mesh>
-        <mesh name="tileSegment3" position={[0, 0.52, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.15, 0.16, 0.04, 8]} />
-          <meshStandardMaterial color="#8b2a1f" roughness={0.9} />
-        </mesh>
-        
-        {/* Finial (pointe) au sommet */}
-        <mesh name="finial" position={[0, 0.68, 0]} castShadow receiveShadow>
-          <coneGeometry args={[0.06, 0.15, 8]} />
-          <meshStandardMaterial color="#6b1b13" roughness={0.85} />
-        </mesh>
-        
-        {/* Sphère décorative dorée */}
-        <mesh name="decorativeSphere" position={[0, 0.78, 0]} castShadow receiveShadow>
-          <sphereGeometry args={[0.1, 16, 16]} />
-          <meshStandardMaterial color="#d4a04f" metalness={0.7} roughness={0.2} />
-        </mesh>
-      </group>
-    );
-  }
-  
-  // Toit de coin (forme en L)
-  if (roofConfig.isCorner) {
-    const rotation = 
-      roofConfig.hasLeft && roofConfig.hasFront ? Math.PI * 0.5 :
-      roofConfig.hasLeft && roofConfig.hasBack ? Math.PI :
-      roofConfig.hasRight && roofConfig.hasBack ? Math.PI * 1.5 :
-      0; // hasRight && hasFront
-    
-    return (
-      <group name="roofCell" position={position} rotation={[0, rotation, 0]}>
-        {/* Structure de base sous le toit */}
-        <mesh name="baseStructure" position={[0, -0.42, 0]} castShadow receiveShadow>
-          <RoundedBox args={[1.0, 0.12, 1.0]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color="#9d3425" roughness={0.92} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Toit principal (côté droit) */}
-        <group name="mainRoofRightGroup" rotation={[Math.PI / 4, 0, 0]} position={[0.2, 0.12, 0]}>
-          <mesh castShadow receiveShadow>
-            <RoundedBox args={[0.7, 0.14, 0.85]} radius={0.02} smoothness={4}>
-              <meshStandardMaterial color={roofColor} roughness={0.88} />
+
+        {/* Corner merlons */}
+        {CORNERS.map(([x, z], i) => (
+          <mesh key={`cm-${i}`} castShadow receiveShadow position={[x, 0.09, z]}>
+            <RoundedBox args={[0.27, 0.50, 0.27]} radius={0.03} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.87} />
             </RoundedBox>
-          </mesh>
-          {/* Tuiles décoratives */}
-          {[-0.2, 0, 0.2].map((xOffset, i) => (
-            <mesh key={i} name={`tileRibRight-${i}`} position={[xOffset, 0.08, 0]} castShadow>
-              <RoundedBox args={[0.03, 0.04, 0.87]} radius={0.01} smoothness={2}>
-                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-          ))}
-        </group>
-
-        <mesh name="mainRoofRightInner" rotation={[-Math.PI / 4, 0, 0]} position={[0.2, 0.12, 0]} castShadow receiveShadow>
-          <RoundedBox args={[0.7, 0.14, 0.85]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={roofColor2} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Toit perpendiculaire (côté avant) */}
-        <group name="mainRoofFrontGroup" rotation={[0, 0, Math.PI / 4]} position={[0, 0.12, 0.2]}>
-          <mesh castShadow receiveShadow>
-            <RoundedBox args={[0.85, 0.14, 0.7]} radius={0.02} smoothness={4}>
-              <meshStandardMaterial color={roofColor} roughness={0.88} />
-            </RoundedBox>
-          </mesh>
-          {/* Tuiles décoratives */}
-          {[-0.2, 0, 0.2].map((zOffset, i) => (
-            <mesh key={i} name={`tileRibFront-${i}`} position={[0, 0.08, zOffset]} castShadow>
-              <RoundedBox args={[0.87, 0.03, 0.04]} radius={0.01} smoothness={2}>
-                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-          ))}
-        </group>
-
-        <mesh name="mainRoofFrontInner" rotation={[0, 0, -Math.PI / 4]} position={[0, 0.12, 0.2]} castShadow receiveShadow>
-          <RoundedBox args={[0.85, 0.14, 0.7]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={roofColor2} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Faîtage */}
-        <mesh name="ridge" position={[0, 0.4, 0]} castShadow receiveShadow>
-          <RoundedBox args={[0.6, 0.08, 0.08]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color="#7b241b" roughness={0.92} />
-          </RoundedBox>
-        </mesh>
-        <mesh name="ridgeSide" position={[0, 0.4, 0]} rotation={[0, Math.PI / 2, 0]} castShadow receiveShadow>
-          <RoundedBox args={[0.6, 0.08, 0.08]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color="#7b241b" roughness={0.92} />
-          </RoundedBox>
-        </mesh>
-      </group>
-    );
-  }
-  
-  // Toit d'extrémité avec pignon
-  if (roofConfig.isEnd) {
-    const rotation = 
-      roofConfig.hasLeft ? Math.PI * 0.5 :
-      roofConfig.hasBack ? Math.PI :
-      roofConfig.hasRight ? Math.PI * 1.5 :
-      0; // hasFront
-    
-    return (
-      <group name="roofCell" position={position} rotation={[0, rotation, 0]}>
-        {/* Structure de base sous le toit */}
-        <mesh name="baseStructure" position={[0, -0.42, 0]} castShadow receiveShadow>
-          <RoundedBox args={[1.0, 0.12, 1.0]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color="#9d3425" roughness={0.92} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Pignon (mur triangulaire à l'extrémité) */}
-        <mesh name="gable" position={[0, 0.05, -0.48]} castShadow receiveShadow>
-          <boxGeometry args={[0.86, 0.7, 0.05]} />
-          <meshStandardMaterial color="#b8a890" roughness={0.94} />
-        </mesh>
-
-        {/* Oeil-de-boeuf (Attic window) sur pignon */}
-        <group name="atticWindow" position={[0, 0.16, -0.51]}>
-          {/* Vitre sombre */}
-          <mesh name="windowGlass" rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.08, 0.08, 0.02, 16]} />
-            <meshStandardMaterial color="#2a3a4a" roughness={0.15} metalness={0.2} transparent opacity={0.85} />
-          </mesh>
-          {/* Cadre en bois */}
-          <mesh name="windowFrame">
-            <torusGeometry args={[0.08, 0.02, 8, 24]} />
-            <meshStandardMaterial color="#4a3a2a" roughness={0.8} />
-          </mesh>
-          {/* Croisillon vertical */}
-          <mesh name="windowBarV" position={[0, 0, 0.005]}>
-            <boxGeometry args={[0.015, 0.16, 0.01]} />
-            <meshStandardMaterial color="#4a3a2a" roughness={0.8} />
-          </mesh>
-          {/* Croisillon horizontal */}
-          <mesh name="windowBarH" position={[0, 0, 0.005]}>
-            <boxGeometry args={[0.16, 0.015, 0.01]} />
-            <meshStandardMaterial color="#4a3a2a" roughness={0.8} />
-          </mesh>
-        </group>
-        
-        {/* Plans de toit inclinés avec tuiles */}
-        <group name="roofSlopeGroup" rotation={[Math.PI / 4, 0, 0]} position={[0, 0.15, 0]}>
-          <mesh castShadow receiveShadow>
-            <RoundedBox args={[1.1, 0.14, 0.8]} radius={0.02} smoothness={4}>
-              <meshStandardMaterial color={roofColor} roughness={0.88} />
-            </RoundedBox>
-          </mesh>
-          {/* Tuiles décoratives */}
-          {[-0.36, -0.12, 0.12, 0.36].map((xOffset, i) => (
-            <mesh key={i} name={`tileRibEnd-${i}`} position={[xOffset, 0.08, 0]} castShadow>
-              <RoundedBox args={[0.035, 0.04, 0.82]} radius={0.01} smoothness={2}>
-                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-          ))}
-        </group>
-
-        <mesh name="roofSlopeInner" rotation={[-Math.PI / 4, 0, 0]} position={[0, 0.15, 0]} castShadow receiveShadow>
-          <RoundedBox args={[1.1, 0.14, 0.8]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={roofColor2} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Faîtage (arête du toit) */}
-        <mesh name="ridge" position={[0, 0.42, 0]} castShadow receiveShadow>
-          <RoundedBox args={[1.16, 0.08, 0.1]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color="#7b241b" roughness={0.92} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Tuiles décoratives le long du faîtage */}
-        {[-0.3, -0.1, 0.1, 0.3].map((xOffset, i) => (
-          <mesh key={i} name={`decorativeTile${i}`} position={[xOffset, 0.46, 0]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.12, 8]} />
-            <meshStandardMaterial color="#8b3424" roughness={0.9} />
           </mesh>
         ))}
 
-        {/* Cheminée déterministe (située à l'arrière, opposée au pignon de devant) */}
-        {renderChimney(0.18)}
+        {/* Face merlons */}
+        {FACES.map(([x, z], i) => {
+          const isZFace = i < 2;
+          return (
+            <mesh key={`fm-${i}`} castShadow receiveShadow position={[x, 0.02, z]}>
+              <RoundedBox
+                args={isZFace ? [0.28, 0.40, 0.10] : [0.10, 0.40, 0.28]}
+                radius={0.025}
+                smoothness={4}
+              >
+                <meshStandardMaterial color={colorDark} roughness={0.88} />
+              </RoundedBox>
+            </mesh>
+          );
+        })}
+
+        {/* Inner platform */}
+        <mesh castShadow receiveShadow position={[0, -0.30, 0]}>
+          <cylinderGeometry args={[0.56, 0.56, 0.06, 12]} />
+          <meshStandardMaterial color={colorDark} roughness={0.92} />
+        </mesh>
+
+        {/* Spire base ring */}
+        <mesh castShadow receiveShadow position={[0, 0.18, 0]}>
+          <cylinderGeometry args={[0.32, 0.38, 0.10, 8]} />
+          <meshStandardMaterial color={roofColor} roughness={0.87} />
+        </mesh>
+
+        {/* Main conical spire */}
+        <mesh castShadow receiveShadow position={[0, 0.60, 0]}>
+          <coneGeometry args={[0.30, 0.90, 8]} />
+          <meshStandardMaterial color={colorDark} roughness={0.84} />
+        </mesh>
+
+        {/* Tile band rings on spire */}
+        {([0.30, 0.46, 0.60] as number[]).map((y, i) => (
+          <mesh key={`ring-${i}`} castShadow position={[0, y, 0]}>
+            <cylinderGeometry args={[0.30 - i * 0.085, 0.30 - i * 0.085, 0.04, 8]} />
+            <meshStandardMaterial color={roofColor} roughness={0.88} />
+          </mesh>
+        ))}
+
+        {/* Golden finial sphere */}
+        <mesh castShadow position={[0, 1.07, 0]}>
+          <sphereGeometry args={[0.07, 16, 16]} />
+          <meshStandardMaterial color="#d4a04f" metalness={0.72} roughness={0.18} />
+        </mesh>
       </group>
     );
   }
-  
-  // Toit standard (simple faîte)
-  const roofAxis = roofConfig.axis;
-  
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CASE 2 — All other cases: proper pitched roof
+  //
+  // Ridge always runs along local Z; rotate group 90° around Y for axis='x'.
+  // Gable faces appear at local ±Z ends where the ridge has no neighbor.
+  // ════════════════════════════════════════════════════════════════════════════
+  const yRot = roofConfig.axis === 'x' ? Math.PI / 2 : 0;
+
+  // After Y rotation of +π/2: local +Z → world +X, local −Z → world −X
+  const needGablePos = roofConfig.axis === 'z'
+    ? !roofConfig.hasFront
+    : !roofConfig.hasRight;
+
+  const needGableNeg = roofConfig.axis === 'z'
+    ? !roofConfig.hasBack
+    : !roofConfig.hasLeft;
+
+  const gableGeo = getGableGeo();
+
   return (
-    <group name="roofCell" position={position}>
-      {/* Structure de base sous le toit */}
-      <mesh name="baseStructure" position={[0, -0.42, 0]} castShadow receiveShadow>
-        <RoundedBox args={[1.0, 0.12, 1.0]} radius={0.02} smoothness={4}>
-          <meshStandardMaterial color="#9d3425" roughness={0.92} />
-        </RoundedBox>
-      </mesh>
-      
-      {/* Plans de toit inclinés avec tuiles */}
-      <group
-        name="mainRoofFrontGroup"
-        rotation={roofAxis === 'x' ? [0, 0, Math.PI / 4] : [Math.PI / 4, 0, 0]}
-        position={[0, 0.12, 0]}
-      >
+    <group name="roofCell" position={position} rotation={[0, yRot, 0]}>
+
+      {/* ── Right slope panel (slopes down toward +X) ── */}
+      <group position={[RUN / 2, CENTER_Y, 0]} rotation={[0, 0, -SLOPE_ANG]}>
+        {/* Main panel surface */}
         <mesh castShadow receiveShadow>
-          <RoundedBox args={[1.32, 0.14, 0.68]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </RoundedBox>
+          <boxGeometry args={[SLOPE_LEN, PANEL_T, PANEL_LEN]} />
+          <meshStandardMaterial color={roofColor} roughness={0.84} />
         </mesh>
-        {/* Tuiles décoratives */}
-        {roofAxis === 'x' ? (
-          [-0.22, 0, 0.22].map((zOffset, i) => (
-            <mesh key={i} name={`tileRib-${i}`} position={[0, 0.08, zOffset]} castShadow>
-              <RoundedBox args={[1.34, 0.04, 0.04]} radius={0.015} smoothness={2}>
-                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-          ))
-        ) : (
-          [-0.44, -0.22, 0, 0.22, 0.44].map((xOffset, i) => (
-            <mesh key={i} name={`tileRib-${i}`} position={[xOffset, 0.08, 0]} castShadow>
-              <RoundedBox args={[0.04, 0.04, 0.70]} radius={0.015} smoothness={2}>
-                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-          ))
-        )}
+        {/* Horizontal tile rib lines */}
+        {RIB_OFFSETS.map((z, i) => (
+          <mesh key={i} castShadow position={[0, PANEL_T / 2 + 0.012, z]}>
+            <boxGeometry args={[SLOPE_LEN, 0.022, 0.042]} />
+            <meshStandardMaterial color={colorDark} roughness={0.92} />
+          </mesh>
+        ))}
       </group>
 
-      <group
-        name="mainRoofBackGroup"
-        rotation={roofAxis === 'x' ? [0, 0, -Math.PI / 4] : [-Math.PI / 4, 0, 0]}
-        position={[0, 0.12, 0]}
-      >
+      {/* ── Left slope panel (slopes down toward −X) ── */}
+      <group position={[-RUN / 2, CENTER_Y, 0]} rotation={[0, 0, SLOPE_ANG]}>
+        {/* Main panel surface */}
         <mesh castShadow receiveShadow>
-          <RoundedBox args={[1.32, 0.14, 0.68]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={roofColor2} roughness={0.88} />
-          </RoundedBox>
+          <boxGeometry args={[SLOPE_LEN, PANEL_T, PANEL_LEN]} />
+          <meshStandardMaterial color={colorLight} roughness={0.84} />
         </mesh>
-        {/* Tuiles décoratives */}
-        {roofAxis === 'x' ? (
-          [-0.22, 0, 0.22].map((zOffset, i) => (
-            <mesh key={i} name={`tileRib-${i}`} position={[0, 0.08, zOffset]} castShadow>
-              <RoundedBox args={[1.34, 0.04, 0.04]} radius={0.015} smoothness={2}>
-                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-          ))
-        ) : (
-          [-0.44, -0.22, 0, 0.22, 0.44].map((xOffset, i) => (
-            <mesh key={i} name={`tileRib-${i}`} position={[xOffset, 0.08, 0]} castShadow>
-              <RoundedBox args={[0.04, 0.04, 0.70]} radius={0.015} smoothness={2}>
-                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
-              </RoundedBox>
-            </mesh>
-          ))
-        )}
+        {/* Horizontal tile rib lines */}
+        {RIB_OFFSETS.map((z, i) => (
+          <mesh key={i} castShadow position={[0, PANEL_T / 2 + 0.012, z]}>
+            <boxGeometry args={[SLOPE_LEN, 0.022, 0.042]} />
+            <meshStandardMaterial color={colorDark} roughness={0.92} />
+          </mesh>
+        ))}
       </group>
-      
-      {/* Faîtage (arête du toit) */}
-      <mesh name="ridge"
-        position={[0, 0.4, 0]} 
-        rotation={roofAxis === 'x' ? [0, 0, 0] : [0, Math.PI / 2, 0]}
-        castShadow 
-        receiveShadow
-      >
-        <RoundedBox args={[1.36, 0.08, 0.12]} radius={0.02} smoothness={4}>
-          <meshStandardMaterial color="#7b241b" roughness={0.92} />
-        </RoundedBox>
+
+      {/* ── Ridge cap ── */}
+      <mesh castShadow receiveShadow position={[0, RIDGE_Y + 0.028, 0]}>
+        <boxGeometry args={[0.14, 0.056, PANEL_LEN + 0.02]} />
+        <meshStandardMaterial color={colorDark} roughness={0.89} />
       </mesh>
-      
-      {/* Tuiles décoratives le long du faîtage */}
-      {roofAxis === 'x' ? (
+
+      {/* ── Ridge end caps (rounded knobs) ── */}
+      {needGablePos && (
+        <mesh castShadow position={[0, RIDGE_Y + 0.028, PANEL_LEN / 2 + 0.01]}>
+          <boxGeometry args={[0.14, 0.056, 0.06]} />
+          <meshStandardMaterial color={colorDark} roughness={0.89} />
+        </mesh>
+      )}
+      {needGableNeg && (
+        <mesh castShadow position={[0, RIDGE_Y + 0.028, -(PANEL_LEN / 2 + 0.01)]}>
+          <boxGeometry args={[0.14, 0.056, 0.06]} />
+          <meshStandardMaterial color={colorDark} roughness={0.89} />
+        </mesh>
+      )}
+
+      {/* ── Right eave board (fascia) ── */}
+      <mesh castShadow receiveShadow position={[0.518, EAVE_Y - 0.020, 0]}>
+        <boxGeometry args={[0.044, 0.064, PANEL_LEN + 0.06]} />
+        <meshStandardMaterial color={colorDark} roughness={0.89} />
+      </mesh>
+
+      {/* ── Left eave board (fascia) ── */}
+      <mesh castShadow receiveShadow position={[-0.518, EAVE_Y - 0.020, 0]}>
+        <boxGeometry args={[0.044, 0.064, PANEL_LEN + 0.06]} />
+        <meshStandardMaterial color={colorDark} roughness={0.89} />
+      </mesh>
+
+      {/* ── Gable face at +Z end ── */}
+      {needGablePos && (
         <>
-          <mesh name="decorativeTile0" position={[-0.35, 0.44, 0]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
-            <meshStandardMaterial color="#8b3424" roughness={0.9} />
+          {/* Triangular gable fill */}
+          <mesh
+            castShadow
+            receiveShadow
+            geometry={gableGeo}
+            position={[0, 0, 0.466]}
+          >
+            <meshStandardMaterial color={roofColor} roughness={0.88} />
           </mesh>
-          <mesh name="decorativeTile1" position={[0, 0.44, 0]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
-            <meshStandardMaterial color="#8b3424" roughness={0.9} />
+          {/* Barge boards along gable slope edges */}
+          <mesh castShadow position={[RUN / 2, CENTER_Y, 0.502]} rotation={[0, 0, -SLOPE_ANG]}>
+            <boxGeometry args={[SLOPE_LEN, 0.04, 0.05]} />
+            <meshStandardMaterial color={colorDark} roughness={0.91} />
           </mesh>
-          <mesh name="decorativeTile2" position={[0.35, 0.44, 0]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
-            <meshStandardMaterial color="#8b3424" roughness={0.9} />
+          <mesh castShadow position={[-RUN / 2, CENTER_Y, 0.502]} rotation={[0, 0, SLOPE_ANG]}>
+            <boxGeometry args={[SLOPE_LEN, 0.04, 0.05]} />
+            <meshStandardMaterial color={colorDark} roughness={0.91} />
           </mesh>
-        </>
-      ) : (
-        <>
-          <mesh name="decorativeTile0" position={[0, 0.44, -0.35]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
-            <meshStandardMaterial color="#8b3424" roughness={0.9} />
-          </mesh>
-          <mesh name="decorativeTile1" position={[0, 0.44, 0]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
-            <meshStandardMaterial color="#8b3424" roughness={0.9} />
-          </mesh>
-          <mesh name="decorativeTile2" position={[0, 0.44, 0.35]} castShadow>
-            <cylinderGeometry args={[0.04, 0.04, 0.14, 8]} />
-            <meshStandardMaterial color="#8b3424" roughness={0.9} />
+          {/* Gable bottom board */}
+          <mesh castShadow receiveShadow position={[0, EAVE_Y - 0.020, 0.502]}>
+            <boxGeometry args={[1.06, 0.064, 0.044]} />
+            <meshStandardMaterial color={colorDark} roughness={0.89} />
           </mesh>
         </>
       )}
 
-      {/* Cheminée déterministe */}
+      {/* ── Gable face at −Z end ── */}
+      {needGableNeg && (
+        <>
+          {/* Triangular gable fill */}
+          <mesh
+            castShadow
+            receiveShadow
+            geometry={gableGeo}
+            position={[0, 0, -0.466]}
+            rotation={[0, Math.PI, 0]}
+          >
+            <meshStandardMaterial color={roofColor} roughness={0.88} />
+          </mesh>
+          {/* Barge boards */}
+          <mesh castShadow position={[RUN / 2, CENTER_Y, -0.502]} rotation={[0, 0, -SLOPE_ANG]}>
+            <boxGeometry args={[SLOPE_LEN, 0.04, 0.05]} />
+            <meshStandardMaterial color={colorDark} roughness={0.91} />
+          </mesh>
+          <mesh castShadow position={[-RUN / 2, CENTER_Y, -0.502]} rotation={[0, 0, SLOPE_ANG]}>
+            <boxGeometry args={[SLOPE_LEN, 0.04, 0.05]} />
+            <meshStandardMaterial color={colorDark} roughness={0.91} />
+          </mesh>
+          {/* Gable bottom board */}
+          <mesh castShadow receiveShadow position={[0, EAVE_Y - 0.020, -0.502]}>
+            <boxGeometry args={[1.06, 0.064, 0.044]} />
+            <meshStandardMaterial color={colorDark} roughness={0.89} />
+          </mesh>
+        </>
+      )}
+
+      {/* ── Chimney ── */}
       {renderChimney()}
+
     </group>
   );
 }
-
