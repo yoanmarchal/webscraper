@@ -13,18 +13,13 @@ export function StandardCell({ cell, position, isIsolated }: StandardCellProps) 
   // Tour isolée - aspect de tour même pour les murs simples
   if (isIsolated) {
     return (
-      <group position={position}>
+      <group name="standardCell" position={position}>
         <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
           <meshStandardMaterial color={cell.color ?? (isFoundation ? '#8d8a80' : '#c0b0a0')} roughness={0.94} />
         </RoundedBox>
         
         {/* Bandes horizontales décoratives pour tour */}
-        <mesh position={[0, 0.35, 0]}>
-          <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
-            <meshStandardMaterial color={isFoundation ? '#6d6a60' : '#9a8a70'} roughness={0.9} />
-          </RoundedBox>
-        </mesh>
-        <mesh position={[0, -0.35, 0]}>
+        <mesh name="decorativeBandTop" position={[0, 0.35, 0]}>
           <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
             <meshStandardMaterial color={isFoundation ? '#6d6a60' : '#9a8a70'} roughness={0.9} />
           </RoundedBox>
@@ -33,19 +28,19 @@ export function StandardCell({ cell, position, isIsolated }: StandardCellProps) 
         {/* Éléments décoratifs aux coins pour aspect de tour */}
         {!isFoundation && (
           <>
-            <mesh position={[-0.45, 0.1, -0.45]} castShadow>
+            <mesh name="cornerDecoration0" position={[-0.45, 0.1, -0.45]} castShadow>
               <cylinderGeometry args={[0.08, 0.1, 0.8, 8]} />
               <meshStandardMaterial color="#8a7a60" roughness={0.92} />
             </mesh>
-            <mesh position={[0.45, 0.1, -0.45]} castShadow>
+            <mesh name="cornerDecoration1" position={[0.45, 0.1, -0.45]} castShadow>
               <cylinderGeometry args={[0.08, 0.1, 0.8, 8]} />
               <meshStandardMaterial color="#8a7a60" roughness={0.92} />
             </mesh>
-            <mesh position={[-0.45, 0.1, 0.45]} castShadow>
+            <mesh name="cornerDecoration2" position={[-0.45, 0.1, 0.45]} castShadow>
               <cylinderGeometry args={[0.08, 0.1, 0.8, 8]} />
               <meshStandardMaterial color="#8a7a60" roughness={0.92} />
             </mesh>
-            <mesh position={[0.45, 0.1, 0.45]} castShadow>
+            <mesh name="cornerDecoration3" position={[0.45, 0.1, 0.45]} castShadow>
               <cylinderGeometry args={[0.08, 0.1, 0.8, 8]} />
               <meshStandardMaterial color="#8a7a60" roughness={0.92} />
             </mesh>
@@ -56,7 +51,7 @@ export function StandardCell({ cell, position, isIsolated }: StandardCellProps) 
         {isFoundation && (
           <>
             {/* Base élargie */}
-            <mesh position={[0, -0.46, 0]}>
+            <mesh name="foundationBase" position={[0, -0.46, 0]}>
               <RoundedBox args={[1.12, 0.06, 1.12]} radius={0.02} smoothness={4} castShadow receiveShadow>
                 <meshStandardMaterial color="#7d7a70" roughness={0.96} />
               </RoundedBox>
@@ -64,7 +59,7 @@ export function StandardCell({ cell, position, isIsolated }: StandardCellProps) 
             
             {/* Joints de pierre en cercle */}
             {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((angle, i) => (
-              <mesh key={i} position={[Math.cos(angle) * 0.48, 0, Math.sin(angle) * 0.48]} rotation={[0, angle, 0]}>
+              <mesh key={i} name={`foundationJoint${i}`} position={[Math.cos(angle) * 0.48, 0, Math.sin(angle) * 0.48]} rotation={[0, angle, 0]}>
                 <boxGeometry args={[0.02, 0.96, 0.05]} />
                 <meshStandardMaterial color="#6d6a60" roughness={0.95} />
               </mesh>
@@ -77,7 +72,7 @@ export function StandardCell({ cell, position, isIsolated }: StandardCellProps) 
 
   // Mur ou fondation standard (non-tour)
   return (
-    <group position={position}>
+    <group name="standardCell" position={position}>
       <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
         <meshStandardMaterial color={cell.color ?? '#b8b8b8'} roughness={0.94} />
       </RoundedBox>

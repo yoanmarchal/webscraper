@@ -20,33 +20,33 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     // Fonction pour créer une meurtrière selon la rotation
     const createArrowSlit = (rotation: number, faceId: number) => {
       return (
-        <group rotation={[0, rotation, 0]} key={`arrowslit-${faceId}`}>
+        <group name="arrowSlit" rotation={[0, rotation, 0]} key={`arrowslit-${faceId}`}>
           {/* Meurtrière extérieure (large) */}
-          <mesh position={[0, 0.1, 0.505]} castShadow receiveShadow>
+          <mesh name="arrowSlitOuter" position={[0, 0.1, 0.505]} castShadow receiveShadow>
             <RoundedBox args={[0.18, 0.55, 0.02]} radius={0.02} smoothness={4}>
               <meshStandardMaterial color="#3a2a1a" roughness={0.95} />
             </RoundedBox>
           </mesh>
           {/* Ouverture intérieure sombre */}
-          <mesh position={[0, 0.1, 0.48]} castShadow receiveShadow>
+          <mesh name="arrowSlitInner" position={[0, 0.1, 0.48]} castShadow receiveShadow>
             <RoundedBox args={[0.08, 0.48, 0.05]} radius={0.01} smoothness={4}>
               <meshStandardMaterial color="#0a0a0a" roughness={0.98} />
             </RoundedBox>
           </mesh>
           {/* Bord décoratif */}
-          <mesh position={[0, 0.1, 0.51]} castShadow>
+          <mesh name="arrowSlitBorder" position={[0, 0.1, 0.51]} castShadow>
             <RoundedBox args={[0.22, 0.59, 0.01]} radius={0.03} smoothness={4}>
               <meshStandardMaterial color="#5a4a3a" roughness={0.88} />
             </RoundedBox>
           </mesh>
           
           {/* Meurtrière inférieure (plus petite) */}
-          <mesh position={[0, -0.28, 0.505]} castShadow receiveShadow>
+          <mesh name="arrowSlitLower" position={[0, -0.28, 0.505]} castShadow receiveShadow>
             <RoundedBox args={[0.12, 0.18, 0.02]} radius={0.02} smoothness={4}>
               <meshStandardMaterial color="#3a2a1a" roughness={0.95} />
             </RoundedBox>
           </mesh>
-          <mesh position={[0, -0.28, 0.48]} castShadow receiveShadow>
+          <mesh name="arrowSlitLowerInner" position={[0, -0.28, 0.48]} castShadow receiveShadow>
             <RoundedBox args={[0.06, 0.12, 0.05]} radius={0.01} smoothness={4}>
               <meshStandardMaterial color="#0a0a0a" roughness={0.98} />
             </RoundedBox>
@@ -56,19 +56,19 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     };
     
     return (
-      <group position={position}>
+      <group name="wallWithWindowCell" position={position}>
         {/* Mur principal de la tour */}
         <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
           <meshStandardMaterial color={cell.color ?? '#d0baa0'} roughness={0.94} />
         </RoundedBox>
         
         {/* Bandes horizontales décoratives */}
-        <mesh position={[0, 0.35, 0]}>
+        <mesh name="decorativeBandTop" position={[0, 0.35, 0]}>
           <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
             <meshStandardMaterial color="#9a8a70" roughness={0.9} />
           </RoundedBox>
         </mesh>
-        <mesh position={[0, -0.35, 0]}>
+        <mesh name="decorativeBandBottom" position={[0, -0.35, 0]}>
           <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
             <meshStandardMaterial color="#9a8a70" roughness={0.9} />
           </RoundedBox>
@@ -98,16 +98,16 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     const variant = (windowVariant + faceId) % 3;
     
     return (
-      <group rotation={[0, rotation, 0]} key={`window-${faceId}`}>
+      <group name="window" rotation={[0, rotation, 0]} key={`window-${faceId}`}>
         {variant === 0 && (
           // Grande fenêtre simple
           <>
-            <mesh position={[0, 0.08, 0.505]} castShadow receiveShadow>
+            <mesh name="largeWindowOuter" position={[0, 0.08, 0.505]} castShadow receiveShadow>
               <RoundedBox args={[0.72, 0.68, 0.02]} radius={0.03} smoothness={4}>
                 <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
               </RoundedBox>
             </mesh>
-            <mesh position={[0, 0.08, 0.495]} castShadow receiveShadow>
+            <mesh name="largeWindowInner" position={[0, 0.08, 0.495]} castShadow receiveShadow>
               <RoundedBox args={[0.64, 0.6, 0.01]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial 
                   color="#2a3a4a" 
@@ -118,15 +118,15 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
                 />
               </RoundedBox>
             </mesh>
-            <mesh position={[0, 0.08, 0.51]} castShadow>
+            <mesh name="largeWindowHorizontalBar" position={[0, 0.08, 0.51]} castShadow>
               <boxGeometry args={[0.68, 0.04, 0.01]} />
               <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
             </mesh>
-            <mesh position={[0, 0.08, 0.51]} castShadow>
+            <mesh name="largeWindowVerticalBar" position={[0, 0.08, 0.51]} castShadow>
               <boxGeometry args={[0.04, 0.64, 0.01]} />
               <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
             </mesh>
-            <mesh position={[0, -0.28, 0.52]} castShadow receiveShadow>
+            <mesh name="largeWindowLower" position={[0, -0.28, 0.52]} castShadow receiveShadow>
               <RoundedBox args={[0.78, 0.06, 0.08]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
               </RoundedBox>
@@ -137,12 +137,12 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         {variant === 1 && (
           // Deux petites fenêtres côte à côte
           <>
-            <mesh position={[-0.22, 0.08, 0.505]} castShadow receiveShadow>
+            <mesh name="smallWindowLeftOuter" position={[-0.22, 0.08, 0.505]} castShadow receiveShadow>
               <RoundedBox args={[0.32, 0.56, 0.02]} radius={0.03} smoothness={4}>
                 <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
               </RoundedBox>
             </mesh>
-            <mesh position={[-0.22, 0.08, 0.495]} castShadow receiveShadow>
+            <mesh name="smallWindowLeftInner" position={[-0.22, 0.08, 0.495]} castShadow receiveShadow>
               <RoundedBox args={[0.26, 0.48, 0.01]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial 
                   color="#2a3a4a" 
@@ -153,16 +153,16 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
                 />
               </RoundedBox>
             </mesh>
-            <mesh position={[-0.22, 0.08, 0.51]} castShadow>
+            <mesh name="smallWindowLeftVerticalBar" position={[-0.22, 0.08, 0.51]} castShadow>
               <boxGeometry args={[0.03, 0.52, 0.01]} />
               <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
             </mesh>
-            <mesh position={[0.22, 0.08, 0.505]} castShadow receiveShadow>
+            <mesh name="smallWindowRightOuter" position={[0.22, 0.08, 0.505]} castShadow receiveShadow>
               <RoundedBox args={[0.32, 0.56, 0.02]} radius={0.03} smoothness={4}>
                 <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
               </RoundedBox>
             </mesh>
-            <mesh position={[0.22, 0.08, 0.495]} castShadow receiveShadow>
+            <mesh name="smallWindowRightInner" position={[0.22, 0.08, 0.495]} castShadow receiveShadow>
               <RoundedBox args={[0.26, 0.48, 0.01]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial 
                   color="#2a3a4a" 
@@ -173,11 +173,11 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
                 />
               </RoundedBox>
             </mesh>
-            <mesh position={[0.22, 0.08, 0.51]} castShadow>
+            <mesh name="smallWindowRightVerticalBar" position={[0.22, 0.08, 0.51]} castShadow>
               <boxGeometry args={[0.03, 0.52, 0.01]} />
               <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
             </mesh>
-            <mesh position={[0, -0.22, 0.52]} castShadow receiveShadow>
+            <mesh name="smallWindowLower" position={[0, -0.22, 0.52]} castShadow receiveShadow>
               <RoundedBox args={[0.78, 0.06, 0.08]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
               </RoundedBox>
@@ -188,12 +188,12 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         {variant === 2 && (
           // Fenêtre avec volets
           <>
-            <mesh position={[0, 0.08, 0.505]} castShadow receiveShadow>
+            <mesh name="largeWindowOuter" position={[0, 0.08, 0.505]} castShadow receiveShadow>
               <RoundedBox args={[0.58, 0.64, 0.02]} radius={0.03} smoothness={4}>
                 <meshStandardMaterial color="#5a4a3a" roughness={0.85} />
               </RoundedBox>
             </mesh>
-            <mesh position={[0, 0.08, 0.495]} castShadow receiveShadow>
+            <mesh name="largeWindowInner" position={[0, 0.08, 0.495]} castShadow receiveShadow>
               <RoundedBox args={[0.5, 0.56, 0.01]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial 
                   color="#2a3a4a" 
@@ -204,37 +204,37 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
                 />
               </RoundedBox>
             </mesh>
-            <mesh position={[0, 0.08, 0.51]} castShadow>
+            <mesh name="largeWindowHorizontalBar" position={[0, 0.08, 0.51]} castShadow>
               <boxGeometry args={[0.54, 0.03, 0.01]} />
               <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
             </mesh>
-            <mesh position={[0, 0.08, 0.51]} castShadow>
+            <mesh name="largeWindowVerticalBar" position={[0, 0.08, 0.51]} castShadow>
               <boxGeometry args={[0.03, 0.6, 0.01]} />
               <meshStandardMaterial color="#4a3a2a" roughness={0.88} />
             </mesh>
-            <mesh position={[-0.38, 0.08, 0.505]} rotation={[0, -0.15, 0]} castShadow receiveShadow>
+            <mesh name="largeWindowLeftShutter" position={[-0.38, 0.08, 0.505]} rotation={[0, -0.15, 0]} castShadow receiveShadow>
               <RoundedBox args={[0.16, 0.64, 0.03]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial color="#7a5a4a" roughness={0.9} />
               </RoundedBox>
             </mesh>
             {[0.2, 0.08, -0.04, -0.16].map((yOffset, i) => (
-              <mesh key={`left-${i}`} position={[-0.38, 0.08 + yOffset, 0.51]} rotation={[0, -0.15, 0]} castShadow>
+              <mesh key={`left-${i}`} name={`largeWindowLeftShutterBar${i}`} position={[-0.38, 0.08 + yOffset, 0.51]} rotation={[0, -0.15, 0]} castShadow>
                 <boxGeometry args={[0.14, 0.02, 0.01]} />
                 <meshStandardMaterial color="#6a4a3a" roughness={0.92} />
               </mesh>
             ))}
-            <mesh position={[0.38, 0.08, 0.505]} rotation={[0, 0.15, 0]} castShadow receiveShadow>
+            <mesh name="largeWindowRightShutter" position={[0.38, 0.08, 0.505]} rotation={[0, 0.15, 0]} castShadow receiveShadow>
               <RoundedBox args={[0.16, 0.64, 0.03]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial color="#7a5a4a" roughness={0.9} />
               </RoundedBox>
             </mesh>
             {[0.2, 0.08, -0.04, -0.16].map((yOffset, i) => (
-              <mesh key={`right-${i}`} position={[0.38, 0.08 + yOffset, 0.51]} rotation={[0, 0.15, 0]} castShadow>
+              <mesh key={`right-${i}`} name={`largeWindowRightShutterBar${i}`} position={[0.38, 0.08 + yOffset, 0.51]} rotation={[0, 0.15, 0]} castShadow>
                 <boxGeometry args={[0.14, 0.02, 0.01]} />
                 <meshStandardMaterial color="#6a4a3a" roughness={0.92} />
               </mesh>
             ))}
-            <mesh position={[0, -0.26, 0.52]} castShadow receiveShadow>
+            <mesh name="largeWindowLower" position={[0, -0.26, 0.52]} castShadow receiveShadow>
               <RoundedBox args={[0.7, 0.06, 0.08]} radius={0.02} smoothness={4}>
                 <meshStandardMaterial color="#6a5a4a" roughness={0.82} />
               </RoundedBox>
@@ -246,7 +246,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   };
   
   return (
-    <group position={position}>
+    <group name="wallWithWindowCell" position={position}>
       {/* Mur principal */}
       <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
         <meshStandardMaterial color={cell.color ?? '#e0c996'} roughness={0.94} />
