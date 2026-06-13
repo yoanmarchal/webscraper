@@ -227,7 +227,7 @@ export class VillageGrid {
 
           if (y === 0) {
             cell.type = BlockType.Foundation;
-          } else if (!hasSupportBelow && isTopMost && horizontalNeighbors.length === 2 && oppositePairs === 1) {
+          } else if (hasSupportBelow && isTopMost && horizontalNeighbors.length === 2 && oppositePairs === 1) {
             cell.type = BlockType.Arch;
           } else if (isTopMost && hasSupportBelow && horizontalNeighbors.length === 0) {
             cell.type = BlockType.Roof;
@@ -235,7 +235,8 @@ export class VillageGrid {
             isTopMost &&
             hasSupportBelow &&
             horizontalNeighborCount >= 1 &&
-            (horizontalNeighborCount <= 2 || oppositePairs === 0)
+            horizontalNeighborCount <= 2 &&
+            oppositePairs === 0
           ) {
             cell.type = BlockType.WallWithWindow;
           } else if (hasSupportBelow) {
