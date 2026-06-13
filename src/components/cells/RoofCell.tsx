@@ -2,6 +2,7 @@ import { RoundedBox } from '@react-three/drei';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { getRoofConfig } from '../../utils/cellUtils';
+import { varyColorBrightness } from '../../colorPalettes';
 
 interface RoofCellProps {
   cell: GridCell;
@@ -14,6 +15,38 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
   const roofConfig = getRoofConfig(lookup, cell);
   const roofColor = cell.color ?? '#c85a3f';
   const roofColor2 = cell.color ?? '#b84731';
+  
+  const roofColorDark = varyColorBrightness(roofColor, -0.15);
+
+  const renderChimney = (offsetZ = 0.2) => {
+    // Placer une cheminée déterministe sur 33% des toits
+    if ((cell.x + cell.z) % 3 !== 0) return null;
+    
+    // Choisir le côté gauche/droite selon les coordonnées
+    const sideX = (cell.x % 2 === 0) ? 0.26 : -0.26;
+    
+    return (
+      <group name="chimney" position={[sideX, 0.15, offsetZ]}>
+        {/* Corps de la cheminée en pierre */}
+        <mesh name="chimneyBody" castShadow receiveShadow>
+          <RoundedBox args={[0.16, 0.55, 0.16]} radius={0.015} smoothness={2}>
+            <meshStandardMaterial color="#9f8f7b" roughness={0.9} />
+          </RoundedBox>
+        </mesh>
+        {/* Chapeau de cheminée */}
+        <mesh name="chimneyCap" position={[0, 0.28, 0]} castShadow>
+          <RoundedBox args={[0.20, 0.04, 0.20]} radius={0.01} smoothness={2}>
+            <meshStandardMaterial color="#7a6a5a" roughness={0.9} />
+          </RoundedBox>
+        </mesh>
+        {/* Pot de cheminée en terre cuite */}
+        <mesh name="chimneyPot" position={[0, 0.34, 0]} castShadow>
+          <cylinderGeometry args={[0.035, 0.04, 0.08, 8]} />
+          <meshStandardMaterial color="#a05a42" roughness={0.8} />
+        </mesh>
+      </group>
+    );
+  };
   
   // Toit de tour (bloc isolé) - créneaux raffinés
   if (isIsolated) {
@@ -149,11 +182,22 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
         </mesh>
         
         {/* Toit principal (côté droit) */}
-        <mesh name="mainRoofRight" rotation={[Math.PI / 4, 0, 0]} position={[0.2, 0.12, 0]} castShadow receiveShadow>
-          <RoundedBox args={[0.7, 0.14, 0.85]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
+        <group name="mainRoofRightGroup" rotation={[Math.PI / 4, 0, 0]} position={[0.2, 0.12, 0]}>
+          <mesh castShadow receiveShadow>
+            <RoundedBox args={[0.7, 0.14, 0.85]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          {/* Tuiles décoratives */}
+          {[-0.2, 0, 0.2].map((xOffset, i) => (
+            <mesh key={i} name={`tileRibRight-${i}`} position={[xOffset, 0.08, 0]} castShadow>
+              <RoundedBox args={[0.03, 0.04, 0.87]} radius={0.01} smoothness={2}>
+                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
+              </RoundedBox>
+            </mesh>
+          ))}
+        </group>
+
         <mesh name="mainRoofRightInner" rotation={[-Math.PI / 4, 0, 0]} position={[0.2, 0.12, 0]} castShadow receiveShadow>
           <RoundedBox args={[0.7, 0.14, 0.85]} radius={0.02} smoothness={4}>
             <meshStandardMaterial color={roofColor2} roughness={0.88} />
@@ -161,11 +205,22 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
         </mesh>
         
         {/* Toit perpendiculaire (côté avant) */}
-        <mesh name="mainRoofFront" rotation={[0, 0, Math.PI / 4]} position={[0, 0.12, 0.2]} castShadow receiveShadow>
-          <RoundedBox args={[0.85, 0.14, 0.7]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
+        <group name="mainRoofFrontGroup" rotation={[0, 0, Math.PI / 4]} position={[0, 0.12, 0.2]}>
+          <mesh castShadow receiveShadow>
+            <RoundedBox args={[0.85, 0.14, 0.7]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          {/* Tuiles décoratives */}
+          {[-0.2, 0, 0.2].map((zOffset, i) => (
+            <mesh key={i} name={`tileRibFront-${i}`} position={[0, 0.08, zOffset]} castShadow>
+              <RoundedBox args={[0.87, 0.03, 0.04]} radius={0.01} smoothness={2}>
+                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
+              </RoundedBox>
+            </mesh>
+          ))}
+        </group>
+
         <mesh name="mainRoofFrontInner" rotation={[0, 0, -Math.PI / 4]} position={[0, 0.12, 0.2]} castShadow receiveShadow>
           <RoundedBox args={[0.85, 0.14, 0.7]} radius={0.02} smoothness={4}>
             <meshStandardMaterial color={roofColor2} roughness={0.88} />
@@ -209,13 +264,48 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
           <boxGeometry args={[0.86, 0.7, 0.05]} />
           <meshStandardMaterial color="#b8a890" roughness={0.94} />
         </mesh>
+
+        {/* Oeil-de-boeuf (Attic window) sur pignon */}
+        <group name="atticWindow" position={[0, 0.16, -0.51]}>
+          {/* Vitre sombre */}
+          <mesh name="windowGlass" rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.08, 0.08, 0.02, 16]} />
+            <meshStandardMaterial color="#2a3a4a" roughness={0.15} metalness={0.2} transparent opacity={0.85} />
+          </mesh>
+          {/* Cadre en bois */}
+          <mesh name="windowFrame">
+            <torusGeometry args={[0.08, 0.02, 8, 24]} />
+            <meshStandardMaterial color="#4a3a2a" roughness={0.8} />
+          </mesh>
+          {/* Croisillon vertical */}
+          <mesh name="windowBarV" position={[0, 0, 0.005]}>
+            <boxGeometry args={[0.015, 0.16, 0.01]} />
+            <meshStandardMaterial color="#4a3a2a" roughness={0.8} />
+          </mesh>
+          {/* Croisillon horizontal */}
+          <mesh name="windowBarH" position={[0, 0, 0.005]}>
+            <boxGeometry args={[0.16, 0.015, 0.01]} />
+            <meshStandardMaterial color="#4a3a2a" roughness={0.8} />
+          </mesh>
+        </group>
         
-        {/* Plans de toit inclinés */}
-        <mesh name="roofSlope" rotation={[Math.PI / 4, 0, 0]} position={[0, 0.15, 0]} castShadow receiveShadow>
-          <RoundedBox args={[1.1, 0.14, 0.8]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </RoundedBox>
-        </mesh>
+        {/* Plans de toit inclinés avec tuiles */}
+        <group name="roofSlopeGroup" rotation={[Math.PI / 4, 0, 0]} position={[0, 0.15, 0]}>
+          <mesh castShadow receiveShadow>
+            <RoundedBox args={[1.1, 0.14, 0.8]} radius={0.02} smoothness={4}>
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </RoundedBox>
+          </mesh>
+          {/* Tuiles décoratives */}
+          {[-0.36, -0.12, 0.12, 0.36].map((xOffset, i) => (
+            <mesh key={i} name={`tileRibEnd-${i}`} position={[xOffset, 0.08, 0]} castShadow>
+              <RoundedBox args={[0.035, 0.04, 0.82]} radius={0.01} smoothness={2}>
+                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
+              </RoundedBox>
+            </mesh>
+          ))}
+        </group>
+
         <mesh name="roofSlopeInner" rotation={[-Math.PI / 4, 0, 0]} position={[0, 0.15, 0]} castShadow receiveShadow>
           <RoundedBox args={[1.1, 0.14, 0.8]} radius={0.02} smoothness={4}>
             <meshStandardMaterial color={roofColor2} roughness={0.88} />
@@ -236,6 +326,9 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
             <meshStandardMaterial color="#8b3424" roughness={0.9} />
           </mesh>
         ))}
+
+        {/* Cheminée déterministe (située à l'arrière, opposée au pignon de devant) */}
+        {renderChimney(0.18)}
       </group>
     );
   }
@@ -252,29 +345,66 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
         </RoundedBox>
       </mesh>
       
-      {/* Plans de toit inclinés */}
-      <mesh
-        name="mainRoofFront"
+      {/* Plans de toit inclinés avec tuiles */}
+      <group
+        name="mainRoofFrontGroup"
         rotation={roofAxis === 'x' ? [0, 0, Math.PI / 4] : [Math.PI / 4, 0, 0]}
         position={[0, 0.12, 0]}
-        castShadow
-        receiveShadow
       >
-        <RoundedBox args={[1.32, 0.14, 0.68]} radius={0.02} smoothness={4}>
-          <meshStandardMaterial color={roofColor} roughness={0.88} />
-        </RoundedBox>
-      </mesh>
-      <mesh
-        name="mainRoofBack"
+        <mesh castShadow receiveShadow>
+          <RoundedBox args={[1.32, 0.14, 0.68]} radius={0.02} smoothness={4}>
+            <meshStandardMaterial color={roofColor} roughness={0.88} />
+          </RoundedBox>
+        </mesh>
+        {/* Tuiles décoratives */}
+        {roofAxis === 'x' ? (
+          [-0.22, 0, 0.22].map((zOffset, i) => (
+            <mesh key={i} name={`tileRib-${i}`} position={[0, 0.08, zOffset]} castShadow>
+              <RoundedBox args={[1.34, 0.04, 0.04]} radius={0.015} smoothness={2}>
+                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
+              </RoundedBox>
+            </mesh>
+          ))
+        ) : (
+          [-0.44, -0.22, 0, 0.22, 0.44].map((xOffset, i) => (
+            <mesh key={i} name={`tileRib-${i}`} position={[xOffset, 0.08, 0]} castShadow>
+              <RoundedBox args={[0.04, 0.04, 0.70]} radius={0.015} smoothness={2}>
+                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
+              </RoundedBox>
+            </mesh>
+          ))
+        )}
+      </group>
+
+      <group
+        name="mainRoofBackGroup"
         rotation={roofAxis === 'x' ? [0, 0, -Math.PI / 4] : [-Math.PI / 4, 0, 0]}
         position={[0, 0.12, 0]}
-        castShadow
-        receiveShadow
       >
-        <RoundedBox args={[1.32, 0.14, 0.68]} radius={0.02} smoothness={4}>
-          <meshStandardMaterial color={roofColor2} roughness={0.88} />
-        </RoundedBox>
-      </mesh>
+        <mesh castShadow receiveShadow>
+          <RoundedBox args={[1.32, 0.14, 0.68]} radius={0.02} smoothness={4}>
+            <meshStandardMaterial color={roofColor2} roughness={0.88} />
+          </RoundedBox>
+        </mesh>
+        {/* Tuiles décoratives */}
+        {roofAxis === 'x' ? (
+          [-0.22, 0, 0.22].map((zOffset, i) => (
+            <mesh key={i} name={`tileRib-${i}`} position={[0, 0.08, zOffset]} castShadow>
+              <RoundedBox args={[1.34, 0.04, 0.04]} radius={0.015} smoothness={2}>
+                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
+              </RoundedBox>
+            </mesh>
+          ))
+        ) : (
+          [-0.44, -0.22, 0, 0.22, 0.44].map((xOffset, i) => (
+            <mesh key={i} name={`tileRib-${i}`} position={[xOffset, 0.08, 0]} castShadow>
+              <RoundedBox args={[0.04, 0.04, 0.70]} radius={0.015} smoothness={2}>
+                <meshStandardMaterial color={roofColorDark} roughness={0.9} />
+              </RoundedBox>
+            </mesh>
+          ))
+        )}
+      </group>
       
       {/* Faîtage (arête du toit) */}
       <mesh name="ridge"
@@ -320,6 +450,10 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
           </mesh>
         </>
       )}
+
+      {/* Cheminée déterministe */}
+      {renderChimney()}
     </group>
   );
 }
+

@@ -1,4 +1,4 @@
-﻿import type { GridCell } from '../types';
+import type { GridCell } from '../types';
 import type { CellLookup } from '../utils/cellUtils';
 import { isIsolatedBlock } from '../utils/cellUtils';
 import { RoofCell } from './cells/RoofCell';
@@ -28,5 +28,5 @@ export function CellMesh({ cell, toWorldPosition, lookup }: CellMeshProps) {
     return <WallWithWindowCell cell={cell} position={position} lookup={lookup} isIsolated={isIsolated} />;
   }
 
-  return <StandardCell cell={cell} position={position} isIsolated={isIsolated} />;
+  return <StandardCell cell={cell} position={position} lookup={lookup} isIsolated={isIsolated} />;
 }

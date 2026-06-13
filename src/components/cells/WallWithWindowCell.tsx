@@ -1,7 +1,8 @@
 import { RoundedBox } from '@react-three/drei';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { getExposedFaces } from '../../utils/cellUtils';
+import { getExposedFaces, hasOccupiedCell } from '../../utils/cellUtils';
+import { varyColorBrightness } from '../../colorPalettes';
 
 interface WallWithWindowCellProps {
   cell: GridCell;
@@ -15,6 +16,140 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   const windowVariant = (cell.x + cell.z) % 3;
   const exposedFaces = getExposedFaces(lookup, cell);
   
+  const baseColor = cell.color ?? '#e0c996';
+  const quoinColor = varyColorBrightness(baseColor, -0.12);
+  const patchColor = varyColorBrightness(baseColor, -0.15);
+  const trimColor = varyColorBrightness(baseColor, -0.08);
+
+  const renderQuoins = () => {
+    const corners = [
+      { dx: -1, dz: -1 },
+      { dx: 1, dz: -1 },
+      { dx: -1, dz: 1 },
+      { dx: 1, dz: 1 },
+    ];
+
+    return corners.map(({ dx, dz }, i) => {
+      const adj1 = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z);
+      const adj2 = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + dz);
+      const diag = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z + dz);
+      const isExposed = !(adj1 && adj2 && diag);
+
+      if (!isExposed) return null;
+
+      const w1_x = 0.16;
+      const w1_z = 0.08;
+      const posX1 = dx * (0.5 - w1_x / 2);
+      const posZ1 = dz * (0.5 - w1_z / 2);
+
+      const w2_x = 0.08;
+      const w2_z = 0.16;
+      const posX2 = dx * (0.5 - w2_x / 2);
+      const posZ2 = dz * (0.5 - w2_z / 2);
+
+      return (
+        <group key={`quoin-${i}`}>
+          <mesh name="quoinL0" position={[posX1, -0.32, posZ1]} castShadow receiveShadow>
+            <RoundedBox args={[w1_x, 0.18, w1_z]} radius={0.01} smoothness={2}>
+              <meshStandardMaterial color={quoinColor} roughness={0.9} />
+            </RoundedBox>
+          </mesh>
+          <mesh name="quoinL1" position={[posX2, 0.0, posZ2]} castShadow receiveShadow>
+            <RoundedBox args={[w2_x, 0.18, w2_z]} radius={0.01} smoothness={2}>
+              <meshStandardMaterial color={quoinColor} roughness={0.9} />
+            </RoundedBox>
+          </mesh>
+          <mesh name="quoinL2" position={[posX1, 0.32, posZ1]} castShadow receiveShadow>
+            <RoundedBox args={[w1_x, 0.18, w1_z]} radius={0.01} smoothness={2}>
+              <meshStandardMaterial color={quoinColor} roughness={0.9} />
+            </RoundedBox>
+          </mesh>
+        </group>
+      );
+    });
+  };
+
+  const renderStonePatches = () => {
+    if (exposedFaces.length === 0) return null;
+
+    const hash1 = Math.abs(cell.x * 23 + cell.y * 37 + cell.z * 13) % 100;
+    const hash2 = Math.abs(cell.x * 61 + cell.y * 29 + cell.z * 43) % 100;
+
+    if (hash1 > 40) return null;
+
+    const face = exposedFaces[hash2 % exposedFaces.length];
+    
+    const offsetX = ((hash1 % 10) / 10 - 0.5) * 0.4;
+    const offsetY = (((hash1 / 10) % 10) / 10 - 0.5) * 0.4;
+
+    const w = 0.18 + (hash2 % 4) * 0.03;
+    const h = 0.12 + ((hash2 / 4) % 3) * 0.02;
+
+    let position: [number, number, number] = [0, 0, 0];
+    let rotation: [number, number, number] = [0, 0, 0];
+
+    switch (face) {
+      case 'front':
+        position = [offsetX, offsetY, 0.503];
+        rotation = [0, 0, 0];
+        break;
+      case 'back':
+        position = [offsetX, offsetY, -0.503];
+        rotation = [0, Math.PI, 0];
+        break;
+      case 'left':
+        position = [-0.503, offsetY, offsetX];
+        rotation = [0, Math.PI / 2, 0];
+        break;
+      case 'right':
+        position = [0.503, offsetY, offsetX];
+        rotation = [0, -Math.PI / 2, 0];
+        break;
+    }
+
+    return (
+      <mesh name="stonePatch" position={position} rotation={rotation} castShadow receiveShadow>
+        <RoundedBox args={[w, h, 0.01]} radius={0.005} smoothness={2}>
+          <meshStandardMaterial color={patchColor} roughness={0.95} />
+        </RoundedBox>
+      </mesh>
+    );
+  };
+
+  const renderBaseTrim = () => {
+    return exposedFaces.map((face, index) => {
+      let rotation: [number, number, number] = [0, 0, 0];
+      let position: [number, number, number] = [0, -0.46, 0];
+      
+      switch (face) {
+        case 'front':
+          position = [0, -0.46, 0.505];
+          rotation = [0, 0, 0];
+          break;
+        case 'back':
+          position = [0, -0.46, -0.505];
+          rotation = [0, Math.PI, 0];
+          break;
+        case 'left':
+          position = [-0.505, -0.46, 0];
+          rotation = [0, Math.PI / 2, 0];
+          break;
+        case 'right':
+          position = [0.505, -0.46, 0];
+          rotation = [0, -Math.PI / 2, 0];
+          break;
+      }
+
+      return (
+        <mesh key={`trim-${index}`} name="baseTrim" position={position} rotation={rotation} castShadow receiveShadow>
+          <RoundedBox args={[1.02, 0.08, 0.02]} radius={0.01} smoothness={2}>
+            <meshStandardMaterial color={trimColor} roughness={0.9} />
+          </RoundedBox>
+        </mesh>
+      );
+    });
+  };
+
   // Tour isolée - meurtrières au lieu de fenêtres
   if (isIsolated) {
     // Fonction pour créer une meurtrière selon la rotation
@@ -251,6 +386,11 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
         <meshStandardMaterial color={cell.color ?? '#e0c996'} roughness={0.94} />
       </RoundedBox>
+
+      {/* Détails décoratifs : chaînages d'angle, maçonnerie apparente et plinthes */}
+      {renderQuoins()}
+      {renderStonePatches()}
+      {renderBaseTrim()}
 
       {/* Créer des fenêtres sur chaque face exposée */}
       {exposedFaces.map((face, index) => {
