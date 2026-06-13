@@ -113,103 +113,116 @@ function CellMesh({
     const roofColor = cell.color ?? '#c85a3f';
     const roofColor2 = cell.color ?? '#b84731';
     
-    // Toit de tour (bloc isolé) - créneaux simples et propres
+    // Toit de tour (bloc isolé) - créneaux raffinés
     if (isIsolated) {
       return (
         <group position={position}>
           {/* Anneau de base formant le chemin de ronde - collé au bas du bloc */}
           <mesh position={[0, -0.425, 0]} castShadow receiveShadow>
-            <RoundedBox args={[1.1, 0.15, 1.1]} radius={0.02} smoothness={4}>
+            <RoundedBox args={[1.15, 0.15, 1.15]} radius={0.02} smoothness={4}>
               <meshStandardMaterial color="#9d3425" roughness={0.92} />
             </RoundedBox>
           </mesh>
           
-          {/* Murs pleins entre les créneaux - formant la base crénelée */}
-          {/* Mur face avant (Z+) */}
-          <mesh position={[0, -0.225, 0.5]} castShadow receiveShadow>
-            <RoundedBox args={[1.0, 0.2, 0.1]} radius={0.02} smoothness={4}>
+          {/* Mur crénelé continu formant un anneau unique */}
+          <mesh position={[0, -0.2, 0]} castShadow receiveShadow rotation={[0, Math.PI / 8, 0]}>
+            <cylinderGeometry args={[0.54, 0.54, 0.25, 8, 1, false]} />
+            <meshStandardMaterial color={roofColor} roughness={0.88} />
+          </mesh>
+          
+          {/* Mur extérieur pour créer l'épaisseur */}
+          <mesh position={[0, -0.2, 0]} castShadow receiveShadow rotation={[0, Math.PI / 8, 0]}>
+            <cylinderGeometry args={[0.46, 0.46, 0.25, 8, 1, false]} />
+            <meshStandardMaterial color={roofColor} roughness={0.88} />
+          </mesh>
+          
+          {/* 8 créneaux (merlons) plus imposants */}
+          {/* Coins - plus larges et plus hauts */}
+          <mesh position={[-0.4, 0.1, -0.4]} castShadow receiveShadow>
+            <RoundedBox args={[0.32, 0.55, 0.32]} radius={0.04} smoothness={4}>
               <meshStandardMaterial color={roofColor} roughness={0.88} />
             </RoundedBox>
           </mesh>
-          {/* Mur face arrière (Z-) */}
-          <mesh position={[0, -0.225, -0.5]} castShadow receiveShadow>
-            <RoundedBox args={[1.0, 0.2, 0.1]} radius={0.02} smoothness={4}>
+          <mesh position={[0.4, 0.1, -0.4]} castShadow receiveShadow>
+            <RoundedBox args={[0.32, 0.55, 0.32]} radius={0.04} smoothness={4}>
               <meshStandardMaterial color={roofColor} roughness={0.88} />
             </RoundedBox>
           </mesh>
-          {/* Mur face gauche (X-) */}
-          <mesh position={[-0.5, -0.225, 0]} castShadow receiveShadow>
-            <RoundedBox args={[0.1, 0.2, 0.9]} radius={0.02} smoothness={4}>
+          <mesh position={[-0.4, 0.1, 0.4]} castShadow receiveShadow>
+            <RoundedBox args={[0.32, 0.55, 0.32]} radius={0.04} smoothness={4}>
               <meshStandardMaterial color={roofColor} roughness={0.88} />
             </RoundedBox>
           </mesh>
-          {/* Mur face droite (X+) */}
-          <mesh position={[0.5, -0.225, 0]} castShadow receiveShadow>
-            <RoundedBox args={[0.1, 0.2, 0.9]} radius={0.02} smoothness={4}>
+          <mesh position={[0.4, 0.1, 0.4]} castShadow receiveShadow>
+            <RoundedBox args={[0.32, 0.55, 0.32]} radius={0.04} smoothness={4}>
               <meshStandardMaterial color={roofColor} roughness={0.88} />
             </RoundedBox>
           </mesh>
           
-          {/* 8 créneaux (merlons) répartis régulièrement */}
-          {/* Coins */}
-          <mesh position={[-0.4, 0.025, -0.4]} castShadow receiveShadow>
-            <RoundedBox args={[0.25, 0.4, 0.25]} radius={0.03} smoothness={4}>
-              <meshStandardMaterial color={roofColor} roughness={0.88} />
-            </RoundedBox>
-          </mesh>
-          <mesh position={[0.4, 0.025, -0.4]} castShadow receiveShadow>
-            <RoundedBox args={[0.25, 0.4, 0.25]} radius={0.03} smoothness={4}>
-              <meshStandardMaterial color={roofColor} roughness={0.88} />
-            </RoundedBox>
-          </mesh>
-          <mesh position={[-0.4, 0.025, 0.4]} castShadow receiveShadow>
-            <RoundedBox args={[0.25, 0.4, 0.25]} radius={0.03} smoothness={4}>
-              <meshStandardMaterial color={roofColor} roughness={0.88} />
-            </RoundedBox>
-          </mesh>
-          <mesh position={[0.4, 0.025, 0.4]} castShadow receiveShadow>
-            <RoundedBox args={[0.25, 0.4, 0.25]} radius={0.03} smoothness={4}>
-              <meshStandardMaterial color={roofColor} roughness={0.88} />
-            </RoundedBox>
-          </mesh>
-          
-          {/* Créneaux sur les faces (centrés) */}
-          <mesh position={[0, 0.025, -0.5]} castShadow receiveShadow>
-            <RoundedBox args={[0.25, 0.4, 0.1]} radius={0.03} smoothness={4}>
+          {/* Créneaux sur les faces - plus larges */}
+          <mesh position={[0, 0.05, -0.52]} castShadow receiveShadow>
+            <RoundedBox args={[0.35, 0.45, 0.12]} radius={0.04} smoothness={4}>
               <meshStandardMaterial color={roofColor2} roughness={0.88} />
             </RoundedBox>
           </mesh>
-          <mesh position={[0, 0.025, 0.5]} castShadow receiveShadow>
-            <RoundedBox args={[0.25, 0.4, 0.1]} radius={0.03} smoothness={4}>
+          <mesh position={[0, 0.05, 0.52]} castShadow receiveShadow>
+            <RoundedBox args={[0.35, 0.45, 0.12]} radius={0.04} smoothness={4}>
               <meshStandardMaterial color={roofColor2} roughness={0.88} />
             </RoundedBox>
           </mesh>
-          <mesh position={[-0.5, 0.025, 0]} castShadow receiveShadow>
-            <RoundedBox args={[0.1, 0.4, 0.25]} radius={0.03} smoothness={4}>
+          <mesh position={[-0.52, 0.05, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.12, 0.45, 0.35]} radius={0.04} smoothness={4}>
               <meshStandardMaterial color={roofColor2} roughness={0.88} />
             </RoundedBox>
           </mesh>
-          <mesh position={[0.5, 0.025, 0]} castShadow receiveShadow>
-            <RoundedBox args={[0.1, 0.4, 0.25]} radius={0.03} smoothness={4}>
+          <mesh position={[0.52, 0.05, 0]} castShadow receiveShadow>
+            <RoundedBox args={[0.12, 0.45, 0.35]} radius={0.04} smoothness={4}>
               <meshStandardMaterial color={roofColor2} roughness={0.88} />
             </RoundedBox>
           </mesh>
           
           {/* Plateforme intérieure */}
-          <mesh position={[0, -0.325, 0]} castShadow receiveShadow>
-            <cylinderGeometry args={[0.55, 0.55, 0.08, 32]} />
+          <mesh position={[0, -0.31, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.58, 0.58, 0.1, 32]} />
             <meshStandardMaterial color={roofColor2} roughness={0.9} />
           </mesh>
           
-          {/* Dôme conique au centre */}
-          <mesh position={[0, 0.175, 0]} castShadow receiveShadow>
-            <coneGeometry args={[0.35, 0.55, 8]} />
-            <meshStandardMaterial color="#7b241b" roughness={0.9} />
+          {/* Toit conique amélioré avec tuiles apparentes */}
+          {/* Base du toit avec bordure */}
+          <mesh position={[0, 0.15, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.42, 0.48, 0.1, 8]} />
+            <meshStandardMaterial color={roofColor} roughness={0.88} />
+          </mesh>
+          
+          {/* Dôme conique principal plus élancé */}
+          <mesh position={[0, 0.32, 0]} castShadow receiveShadow>
+            <coneGeometry args={[0.38, 0.7, 8]} />
+            <meshStandardMaterial color="#7b241b" roughness={0.85} />
+          </mesh>
+          
+          {/* Segments de tuiles (anneaux décoratifs) */}
+          <mesh position={[0, 0.25, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.35, 0.36, 0.04, 8]} />
+            <meshStandardMaterial color="#8b2a1f" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.25, 0.26, 0.04, 8]} />
+            <meshStandardMaterial color="#8b2a1f" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.52, 0]} castShadow receiveShadow>
+            <cylinderGeometry args={[0.15, 0.16, 0.04, 8]} />
+            <meshStandardMaterial color="#8b2a1f" roughness={0.9} />
+          </mesh>
+          
+          {/* Finial (pointe) au sommet */}
+          <mesh position={[0, 0.68, 0]} castShadow receiveShadow>
+            <coneGeometry args={[0.06, 0.15, 8]} />
+            <meshStandardMaterial color="#6b1b13" roughness={0.85} />
           </mesh>
           
           {/* Sphère décorative dorée */}
-          <mesh position={[0, 0.505, 0]} castShadow receiveShadow>
-            <sphereGeometry args={[0.09, 16, 16]} />
+          <mesh position={[0, 0.78, 0]} castShadow receiveShadow>
+            <sphereGeometry args={[0.1, 16, 16]} />
             <meshStandardMaterial color="#d4a04f" metalness={0.7} roughness={0.2} />
           </mesh>
         </group>
