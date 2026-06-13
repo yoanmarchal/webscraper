@@ -19,8 +19,8 @@ export function StandardCell({ cell, position, isIsolated }: StandardCellProps) 
         </RoundedBox>
         
         {/* Bandes horizontales décoratives pour tour */}
-        <mesh name="decorativeBandTop" position={[0, 0.35, 0]}>
-          <RoundedBox args={[1, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
+        <mesh name="decorativeBandTop" position={[0, 0.455, 0]}>
+          <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
             <meshStandardMaterial color={isFoundation ? '#6d6a60' : '#9a8a70'} roughness={0.9} />
           </RoundedBox>
         </mesh>
@@ -80,12 +80,12 @@ export function StandardCell({ cell, position, isIsolated }: StandardCellProps) 
       {/* Corniche horizontale sur les murs (pas sur les fondations) */}
       {!isFoundation && (
         <>
-          <mesh position={[0, 0.46, 0]}>
+          <mesh name='cornicheTop' position={[0, 0.46, 0]}>
             <RoundedBox args={[1.04, 0.06, 1.04]} radius={0.02} smoothness={4} castShadow receiveShadow>
               <meshStandardMaterial color="#d8c8ae" roughness={0.86} />
             </RoundedBox>
           </mesh>
-          <mesh position={[0, 0.38, 0]}>
+          <mesh name='cornicheMiddle' position={[0, 0.38, 0]}>
             <RoundedBox args={[1.02, 0.04, 1.02]} radius={0.01} smoothness={4} castShadow>
               <meshStandardMaterial color="#c8b89e" roughness={0.88} />
             </RoundedBox>
@@ -97,43 +97,43 @@ export function StandardCell({ cell, position, isIsolated }: StandardCellProps) 
       {isFoundation && (
         <>
           {/* Joints de pierre horizontaux */}
-          <mesh position={[0, 0.15, 0.505]}>
+          <mesh name='foundationJointTop' position={[0, 0.15, 0.505]}>
             <boxGeometry args={[0.98, 0.02, 0.01]} />
             <meshStandardMaterial color="#6d6a60" roughness={0.95} />
           </mesh>
-          <mesh position={[0, -0.15, 0.505]}>
+          <mesh name='foundationJointBottom' position={[0, -0.15, 0.505]}>
             <boxGeometry args={[0.98, 0.02, 0.01]} />
             <meshStandardMaterial color="#6d6a60" roughness={0.95} />
           </mesh>
-          <mesh position={[0.505, 0.15, 0]}>
+          <mesh name='foundationJointRight' position={[0.505, 0.15, 0]}>
             <boxGeometry args={[0.01, 0.02, 0.98]} />
             <meshStandardMaterial color="#6d6a60" roughness={0.95} />
           </mesh>
-          <mesh position={[0.505, -0.15, 0]}>
+          <mesh name='foundationJointRightBottom' position={[0.505, -0.15, 0]}>
             <boxGeometry args={[0.01, 0.02, 0.98]} />
             <meshStandardMaterial color="#6d6a60" roughness={0.95} />
           </mesh>
           
           {/* Joints verticaux */}
-          <mesh position={[-0.25, 0, 0.505]}>
+          <mesh name='foundationJointLeft' position={[-0.25, 0, 0.505]}>
             <boxGeometry args={[0.02, 0.96, 0.01]} />
             <meshStandardMaterial color="#6d6a60" roughness={0.95} />
           </mesh>
-          <mesh position={[0.25, 0, 0.505]}>
+          <mesh name='foundationJointRight' position={[0.25, 0, 0.505]}>
             <boxGeometry args={[0.02, 0.96, 0.01]} />
             <meshStandardMaterial color="#6d6a60" roughness={0.95} />
           </mesh>
-          <mesh position={[-0.25, 0, -0.505]}>
+          <mesh name='foundationJointLeftBack' position={[-0.25, 0, -0.505]}>
             <boxGeometry args={[0.02, 0.96, 0.01]} />
             <meshStandardMaterial color="#6d6a60" roughness={0.95} />
           </mesh>
-          <mesh position={[0.25, 0, -0.505]}>
+          <mesh name='foundationJointRightBack' position={[0.25, 0, -0.505]}>
             <boxGeometry args={[0.02, 0.96, 0.01]} />
             <meshStandardMaterial color="#6d6a60" roughness={0.95} />
           </mesh>
           
           {/* Base élargie de fondation */}
-          <mesh position={[0, -0.48, 0]}>
+          <mesh name='foundationBase' position={[0, -0.48, 0]}>
             <RoundedBox args={[1.08, 0.02, 1.08]} radius={0.01} smoothness={4} castShadow receiveShadow>
               <meshStandardMaterial color="#7d7a70" roughness={0.96} />
             </RoundedBox>
