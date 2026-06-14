@@ -242,7 +242,13 @@ export class VillageGrid {
             );
 
           if (y === 0) {
-            cell.type = BlockType.Foundation;
+            // Au sol : fondation solide sauf si des faces sont exposées → WallWithWindow
+            const hasExposedFace =
+              !cellLeft?.isOccupied ||
+              !cellRight?.isOccupied ||
+              !cellFront?.isOccupied ||
+              !cellBack?.isOccupied;
+            cell.type = hasExposedFace ? BlockType.WallWithWindow : BlockType.Foundation;
           } else if (isArch) {
             cell.type = BlockType.Arch;
           } else if (isTopMost) {
