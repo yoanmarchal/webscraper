@@ -1,10 +1,8 @@
 import * as THREE from 'three';
-import { RoundedBox } from '@react-three/drei';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { getRoofConfig, getCornerRadii } from '../../utils/cellUtils';
+import { getRoofConfig } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
-import { ShapedBox } from '../ShapedBox';
 
 interface RoofCellProps {
   cell: GridCell;
@@ -14,15 +12,18 @@ interface RoofCellProps {
 }
 
 // ── Geometry constants (local cell space: Y=0 is cell center, ±0.5 = cell edges) ──
-const EAVE_Y    = -0.42;                                  // bottom of slope (eave)
+const EAVE_Y    = -0.50;                                  // bottom of slope flush with cell bottom
 const RIDGE_Y   =  0.22;                                  // top of slope (ridge)
-const RISE      = RIDGE_Y - EAVE_Y;                       // 0.64
+const RISE      = RIDGE_Y - EAVE_Y;                       // 0.72
 const RUN       = 0.5;                                     // horizontal run = half cell width
-const SLOPE_LEN = Math.sqrt(RISE * RISE + RUN * RUN);     // ≈ 0.806
-const SLOPE_ANG = Math.atan2(RISE, RUN);                  // ≈ 51.9°  in radians
-const CENTER_Y  = (EAVE_Y + RIDGE_Y) / 2;               // −0.10 (mid-slope Y)
+const SLOPE_LEN = Math.sqrt(RISE * RISE + RUN * RUN);     // ≈ 0.872
+const SLOPE_ANG = Math.atan2(RISE, RUN);                  // radians
+const CENTER_Y  = (EAVE_Y + RIDGE_Y) / 2;
 const PANEL_LEN = 1.08;                                    // panel length along ridge (incl. overhang)
 const PANEL_T   = 0.055;                                   // panel thickness
+
+// Tour radius matches the cylinder body (r = 0.5 = cell half-width)
+const TOWER_R = 0.50;
 
 // ── Shared gable geometry (triangular prism) – created once ──────────────────
 function buildGableGeometry(): THREE.BufferGeometry {
@@ -85,9 +86,6 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
   const colorDark  = varyColorBrightness(roofColor, -0.18);
   const colorLight = varyColorBrightness(roofColor, 0.07);
 
-  // ── Shape inheritance: corner radii driven by neighbours ──────────────────
-  const radii = getCornerRadii(lookup, cell);
-
   // Rib Z offsets in panel-local space (4 tile rows along the ridge direction)
   const RIB_OFFSETS: number[] = [-0.40, -0.13, 0.13, 0.40];
 
@@ -117,76 +115,89 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
   };
 
   // ════════════════════════════════════════════════════════════════════════════
-  // CASE 1 — Isolated tower (battlements + conical spire)
+  // CASE 1 — Isolated tower: round parapet + conical spire
+  //
+  // Designed to sit flush on top of the cylindrical body below (r = 0.5).
+  // All elements are circular to match the tower shape.
   // ════════════════════════════════════════════════════════════════════════════
   if (isIsolated) {
-    const CORNERS: [number, number][] = [[-0.38, -0.38], [0.38, -0.38], [-0.38, 0.38], [0.38, 0.38]];
-    const FACES:   [number, number][] = [[0, -0.50], [0, 0.50], [-0.50, 0], [0.50, 0]];
+    // Parapet : cylindre solide légèrement plus large que le corps (r=0.5)
+    // Il descend 0.05 sous la limite de la cellule pour chevaucher le corps en dessous.
+    const PARAPET_R     = TOWER_R + 0.04;   // overhang léger sur le cylindre
+    const PARAPET_Y_BOT = -0.55;            // -0.05 sous la limite → chevauche le corps
+    const PARAPET_Y_TOP = -0.10;
+    const PARAPET_H     = PARAPET_Y_TOP - PARAPET_Y_BOT;  // 0.45
+    const PARAPET_MID_Y = PARAPET_Y_BOT + PARAPET_H / 2;
+
+    // Merlons circulaires espacés régulièrement sur le bord du parapet
+    const MERLON_COUNT  = 6;
+    const MERLON_R      = 0.10;
+    const MERLON_H      = 0.28;
+    const MERLON_RING_R = TOWER_R;
+    const MERLON_Y      = PARAPET_Y_TOP + MERLON_H / 2;
+
+    // Flèche conique
+    const SPIRE_BASE_R  = TOWER_R - 0.06;
+    const SPIRE_H       = 1.10;
+
     return (
       <group name="roofCell" position={position}>
-        {/* Battlement ledge */}
-        <mesh castShadow receiveShadow position={[0, -0.40, 0]}>
-          <RoundedBox args={[1.10, 0.12, 1.10]} radius={0.02} smoothness={4}>
-            <meshStandardMaterial color={colorDark} roughness={0.93} />
-          </RoundedBox>
+
+        {/* ── Corps du parapet (cylindre solide) ── */}
+        <mesh castShadow receiveShadow position={[0, PARAPET_MID_Y, 0]}>
+          <cylinderGeometry args={[PARAPET_R, PARAPET_R, PARAPET_H, 24]} />
+          <meshStandardMaterial color={roofColor} roughness={0.90} />
         </mesh>
 
-        {/* Corner merlons */}
-        {CORNERS.map(([x, z], i) => (
-          <mesh key={`cm-${i}`} castShadow receiveShadow position={[x, 0.09, z]}>
-            <RoundedBox args={[0.27, 0.50, 0.27]} radius={0.03} smoothness={4}>
-              <meshStandardMaterial color={roofColor} roughness={0.87} />
-            </RoundedBox>
-          </mesh>
-        ))}
+        {/* ── Bandeau de couronnement ── */}
+        <mesh castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.02, 0]}>
+          <cylinderGeometry args={[PARAPET_R + 0.02, PARAPET_R + 0.02, 0.04, 24]} />
+          <meshStandardMaterial color={colorDark} roughness={0.88} />
+        </mesh>
 
-        {/* Face merlons */}
-        {FACES.map(([x, z], i) => {
-          const isZFace = i < 2;
+        {/* ── Merlons ── */}
+        {Array.from({ length: MERLON_COUNT }).map((_, i) => {
+          const angle = (i / MERLON_COUNT) * Math.PI * 2;
+          const mx = Math.cos(angle) * MERLON_RING_R;
+          const mz = Math.sin(angle) * MERLON_RING_R;
           return (
-            <mesh key={`fm-${i}`} castShadow receiveShadow position={[x, 0.02, z]}>
-              <RoundedBox
-                args={isZFace ? [0.28, 0.40, 0.10] : [0.10, 0.40, 0.28]}
-                radius={0.025}
-                smoothness={4}
-              >
-                <meshStandardMaterial color={colorDark} roughness={0.88} />
-              </RoundedBox>
+            <mesh key={`merlon-${i}`} castShadow receiveShadow position={[mx, MERLON_Y, mz]}>
+              <cylinderGeometry args={[MERLON_R, MERLON_R * 1.1, MERLON_H, 10]} />
+              <meshStandardMaterial color={roofColor} roughness={0.87} />
             </mesh>
           );
         })}
 
-        {/* Inner platform */}
-        <mesh castShadow receiveShadow position={[0, -0.30, 0]}>
-          <cylinderGeometry args={[0.56, 0.56, 0.06, 12]} />
-          <meshStandardMaterial color={colorDark} roughness={0.92} />
+        {/* ── Bague de base de flèche ── */}
+        <mesh castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.09, 0]}>
+          <cylinderGeometry args={[SPIRE_BASE_R + 0.04, SPIRE_BASE_R + 0.08, 0.10, 16]} />
+          <meshStandardMaterial color={colorDark} roughness={0.88} />
         </mesh>
 
-        {/* Spire base ring */}
-        <mesh castShadow receiveShadow position={[0, 0.18, 0]}>
-          <cylinderGeometry args={[0.32, 0.38, 0.10, 8]} />
-          <meshStandardMaterial color={roofColor} roughness={0.87} />
+        {/* ── Flèche conique ── */}
+        <mesh castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.14 + SPIRE_H / 2, 0]}>
+          <coneGeometry args={[SPIRE_BASE_R, SPIRE_H, 16]} />
+          <meshStandardMaterial color={colorDark} roughness={0.82} />
         </mesh>
 
-        {/* Main conical spire */}
-        <mesh castShadow receiveShadow position={[0, 0.60, 0]}>
-          <coneGeometry args={[0.30, 0.90, 8]} />
-          <meshStandardMaterial color={colorDark} roughness={0.84} />
+        {/* ── Anneaux de tuiles sur la flèche ── */}
+        {[0.18, 0.36, 0.54, 0.72].map((t, i) => {
+          const bandR = SPIRE_BASE_R * (1 - t);
+          const bandY = PARAPET_Y_TOP + 0.14 + t * SPIRE_H;
+          return (
+            <mesh key={`band-${i}`} castShadow position={[0, bandY, 0]}>
+              <cylinderGeometry args={[bandR + 0.015, bandR + 0.015, 0.03, 16]} />
+              <meshStandardMaterial color={roofColor} roughness={0.88} />
+            </mesh>
+          );
+        })}
+
+        {/* ── Épis doré ── */}
+        <mesh castShadow position={[0, PARAPET_Y_TOP + 0.14 + SPIRE_H + 0.06, 0]}>
+          <sphereGeometry args={[0.06, 12, 12]} />
+          <meshStandardMaterial color="#d4a04f" metalness={0.75} roughness={0.15} />
         </mesh>
 
-        {/* Tile band rings on spire */}
-        {([0.30, 0.46, 0.60] as number[]).map((y, i) => (
-          <mesh key={`ring-${i}`} castShadow position={[0, y, 0]}>
-            <cylinderGeometry args={[0.30 - i * 0.085, 0.30 - i * 0.085, 0.04, 8]} />
-            <meshStandardMaterial color={roofColor} roughness={0.88} />
-          </mesh>
-        ))}
-
-        {/* Golden finial sphere */}
-        <mesh castShadow position={[0, 1.07, 0]}>
-          <sphereGeometry args={[0.07, 16, 16]} />
-          <meshStandardMaterial color="#d4a04f" metalness={0.72} roughness={0.18} />
-        </mesh>
       </group>
     );
   }

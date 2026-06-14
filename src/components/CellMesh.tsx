@@ -1,6 +1,6 @@
 import type { GridCell } from '../types';
 import type { CellLookup } from '../utils/cellUtils';
-import { isTowerColumn } from '../utils/cellUtils';
+import { isTowerColumn, isIsolatedBlock } from '../utils/cellUtils';
 import { RoofCell } from './cells/RoofCell';
 import { ArchCell } from './cells/ArchCell';
 import { WallWithWindowCell } from './cells/WallWithWindowCell';
@@ -14,12 +14,17 @@ interface CellMeshProps {
 
 export function CellMesh({ cell, toWorldPosition, lookup }: CellMeshProps) {
   const position = toWorldPosition(cell.x, cell.y, cell.z);
-  // Une cellule est "tour" si elle-même ou n'importe quel étage au-dessus
-  // dans la même colonne est isolé — la forme cylindrique se propage vers le bas.
-  const isIsolated = isTowerColumn(lookup, cell);
+
+  // Pour les murs/fondations : forme cylindrique si n'importe quel étage
+  // au-dessus de la colonne est isolé (propagation vers le bas).
+  const isTower = isTowerColumn(lookup, cell);
+
+  // Pour les toits : tour isolée seulement si le toit lui-même n'a pas
+  // de voisins horizontaux — pas de propagation vers le bas ici.
+  const isIsolatedRoof = isIsolatedBlock(lookup, cell);
 
   if (cell.type === 'ROOF') {
-    return <RoofCell cell={cell} position={position} lookup={lookup} isIsolated={isIsolated} />;
+    return <RoofCell cell={cell} position={position} lookup={lookup} isIsolated={isIsolatedRoof} />;
   }
 
   if (cell.type === 'ARCH') {
@@ -27,8 +32,8 @@ export function CellMesh({ cell, toWorldPosition, lookup }: CellMeshProps) {
   }
 
   if (cell.type === 'WALL_WINDOW') {
-    return <WallWithWindowCell cell={cell} position={position} lookup={lookup} isIsolated={isIsolated} />;
+    return <WallWithWindowCell cell={cell} position={position} lookup={lookup} isIsolated={isTower} />;
   }
 
-  return <StandardCell cell={cell} position={position} lookup={lookup} isIsolated={isIsolated} />;
+  return <StandardCell cell={cell} position={position} lookup={lookup} isIsolated={isTower} />;
 }
