@@ -234,7 +234,12 @@ export class VillageGrid {
           const isArch =
             horizontalNeighbors.length === 2 &&
             oppositePairs === 1 &&
-            (!hasSupportBelow || hasTallerOppositeNeighbor);
+            (!hasSupportBelow || hasTallerOppositeNeighbor) &&
+            // Un arche ne peut pas être au même niveau qu'un toit adjacent :
+            // ses deux voisins porteurs doivent avoir au moins un étage au-dessus
+            horizontalNeighbors.every(
+              (n) => this.getNeighborCell(n.x, n.y + 1, n.z)?.isOccupied === true,
+            );
 
           if (y === 0) {
             cell.type = BlockType.Foundation;

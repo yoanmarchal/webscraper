@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { RoundedBox } from '@react-three/drei';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { getRoofConfig } from '../../utils/cellUtils';
+import { getRoofConfig, getCornerRadii } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
+import { ShapedBox } from '../ShapedBox';
 
 interface RoofCellProps {
   cell: GridCell;
@@ -83,6 +84,9 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
   const roofColor  = cell.color ?? '#c85a3f';
   const colorDark  = varyColorBrightness(roofColor, -0.18);
   const colorLight = varyColorBrightness(roofColor, 0.07);
+
+  // ── Shape inheritance: corner radii driven by neighbours ──────────────────
+  const radii = getCornerRadii(lookup, cell);
 
   // Rib Z offsets in panel-local space (4 tile rows along the ridge direction)
   const RIB_OFFSETS: number[] = [-0.40, -0.13, 0.13, 0.40];

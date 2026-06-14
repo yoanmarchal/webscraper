@@ -1,8 +1,9 @@
 import { RoundedBox } from '@react-three/drei';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { getExposedFaces, hasOccupiedCell } from '../../utils/cellUtils';
+import { getExposedFaces, hasOccupiedCell, getCornerRadii } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
+import { ShapedBox } from '../ShapedBox';
 
 interface WallWithWindowCellProps {
   cell: GridCell;
@@ -20,6 +21,9 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   const quoinColor = varyColorBrightness(baseColor, -0.12);
   const patchColor = varyColorBrightness(baseColor, -0.15);
   const trimColor = varyColorBrightness(baseColor, -0.08);
+
+  // ── Shape inheritance: corner radii driven by neighbours ──────────────────
+  const radii = getCornerRadii(lookup, cell);
 
   const renderQuoins = () => {
     const corners = [
@@ -192,21 +196,25 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     
     return (
       <group name="wallWithWindowCell" position={position}>
-        {/* Mur principal de la tour */}
-        <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
-          <meshStandardMaterial color={cell.color ?? '#d0baa0'} roughness={0.94} />
-        </RoundedBox>
+        {/* Corps principal : cylindre circulaire (vraie tour ronde) */}
+        <ShapedBox
+          args={[1.0, 1.0, 1.0]}
+          radii={radii}
+          isIsolated={true}
+          color={cell.color ?? '#d0baa0'}
+          roughness={0.94}
+          castShadow
+          receiveShadow
+        />
         
-        {/* Bandes horizontales décoratives */}
-        <mesh name="decorativeBandTop" position={[0, 0.35, 0]}>
-          <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
-            <meshStandardMaterial color="#9a8a70" roughness={0.9} />
-          </RoundedBox>
+        {/* Bandes horizontales décoratives (anneau sur le cylindre) */}
+        <mesh name="decorativeBandTop" position={[0, 0.35, 0]} castShadow>
+          <cylinderGeometry args={[0.52, 0.52, 0.05, 24]} />
+          <meshStandardMaterial color="#9a8a70" roughness={0.9} />
         </mesh>
-        <mesh name="decorativeBandBottom" position={[0, -0.35, 0]}>
-          <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
-            <meshStandardMaterial color="#9a8a70" roughness={0.9} />
-          </RoundedBox>
+        <mesh name="decorativeBandBottom" position={[0, -0.35, 0]} castShadow>
+          <cylinderGeometry args={[0.52, 0.52, 0.05, 24]} />
+          <meshStandardMaterial color="#9a8a70" roughness={0.9} />
         </mesh>
 
         {/* Créer des meurtrières sur chaque face exposée */}
@@ -382,10 +390,16 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   
   return (
     <group name="wallWithWindowCell" position={position}>
-      {/* Mur principal */}
-      <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
-        <meshStandardMaterial color={cell.color ?? '#e0c996'} roughness={0.94} />
-      </RoundedBox>
+      {/* Mur principal : coins arrondis sur les faces exposées, plats sur les joints */}
+      <ShapedBox
+        args={[1.0, 1.0, 1.0]}
+        radii={radii}
+        isIsolated={false}
+        color={cell.color ?? '#e0c996'}
+        roughness={0.94}
+        castShadow
+        receiveShadow
+      />
 
       {/* Détails décoratifs : chaînages d'angle, maçonnerie apparente et plinthes */}
       {renderQuoins()}

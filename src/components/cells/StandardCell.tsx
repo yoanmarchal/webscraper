@@ -1,8 +1,9 @@
 import { RoundedBox } from '@react-three/drei';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { hasOccupiedCell, getExposedFaces } from '../../utils/cellUtils';
+import { hasOccupiedCell, getExposedFaces, getCornerRadii } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
+import { ShapedBox } from '../ShapedBox';
 
 interface StandardCellProps {
   cell: GridCell;
@@ -18,6 +19,9 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   const quoinColor = varyColorBrightness(baseColor, -0.12);
   const patchColor = varyColorBrightness(baseColor, -0.15);
   const trimColor = varyColorBrightness(baseColor, -0.08);
+
+  // ── Shape inheritance: corner radii driven by neighbours ──────────────────
+  const radii = getCornerRadii(lookup, cell);
 
   const renderQuoins = () => {
     const corners = [
@@ -160,37 +164,24 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   if (isIsolated) {
     return (
       <group name="standardCellIsolated" position={position}>
-        <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
-          <meshStandardMaterial color={baseColor} roughness={0.94} />
-        </RoundedBox>
+        {/* Corps principal : cylindre circulaire (vraie tour ronde) */}
+        <ShapedBox
+          args={[1.0, 1.0, 1.0]}
+          radii={radii}
+          isIsolated={true}
+          color={baseColor}
+          roughness={0.94}
+          castShadow
+          receiveShadow
+        />
         
-        {/* Bandes horizontales décoratives pour tour */}
-        <mesh name="decorativeBandTop" position={[0, 0.455, 0]}>
-          <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.01} smoothness={4} castShadow>
-            <meshStandardMaterial color={isFoundation ? '#6d6a60' : '#9a8a70'} roughness={0.9} />
-          </RoundedBox>
-        </mesh>
-        
-        {/* Éléments décoratifs aux coins pour aspect de tour */}
+        {/* Éléments décoratifs : bande horizontale */}
         {!isFoundation && (
-          <>
-            <mesh name="cornerDecoration0" position={[-0.45, 0, -0.45]} castShadow>
-              <cylinderGeometry args={[0.1, 0.1, 1, 10]} />
-              <meshStandardMaterial color="#8a7a60" roughness={0.92} />
-            </mesh>
-            <mesh name="cornerDecoration1" position={[0.45, 0, -0.45]} castShadow>
-              <cylinderGeometry args={[0.1, 0.1, 1, 10]} />
-              <meshStandardMaterial color="#8a7a60" roughness={0.92} />
-            </mesh>
-            <mesh name="cornerDecoration2" position={[-0.45, 0, 0.45]} castShadow>
-              <cylinderGeometry args={[0.1, 0.1, 1, 10]} />
-              <meshStandardMaterial color="#8a7a60" roughness={0.92} />
-            </mesh>
-            <mesh name="cornerDecoration3" position={[0.45, 0, 0.45]} castShadow>
-              <cylinderGeometry args={[0.1, 0.1, 1, 10]} />
-              <meshStandardMaterial color="#8a7a60" roughness={0.92} />
-            </mesh>
-          </>
+          <mesh name="decorativeBandTop" position={[0, 0.455, 0]}>
+            <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.5} smoothness={8} castShadow>
+              <meshStandardMaterial color="#9a8a70" roughness={0.9} />
+            </RoundedBox>
+          </mesh>
         )}
         
         {/* Fondation renforcée pour tour */}
@@ -211,9 +202,16 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   // Mur ou fondation standard (non-tour)
   return (
     <group name="standardCell" position={position}>
-      <RoundedBox args={[1.0, 1.0, 1.0]} radius={0.08} smoothness={4} castShadow receiveShadow>
-        <meshStandardMaterial color={cell.color ?? '#b8b8b8'} roughness={0.94} />
-      </RoundedBox>
+      {/* Corps principal : coins arrondis sur les faces exposées, plats sur les joints */}
+      <ShapedBox
+        args={[1.0, 1.0, 1.0]}
+        radii={radii}
+        isIsolated={false}
+        color={cell.color ?? '#b8b8b8'}
+        roughness={0.94}
+        castShadow
+        receiveShadow
+      />
       
       {/* Détails de murs et fondations : pierres d'angle, maçonnerie apparente et plinthes */}
       {renderQuoins()}

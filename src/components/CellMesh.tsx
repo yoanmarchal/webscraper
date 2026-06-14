@@ -1,6 +1,6 @@
 import type { GridCell } from '../types';
 import type { CellLookup } from '../utils/cellUtils';
-import { isIsolatedBlock } from '../utils/cellUtils';
+import { isTowerColumn } from '../utils/cellUtils';
 import { RoofCell } from './cells/RoofCell';
 import { ArchCell } from './cells/ArchCell';
 import { WallWithWindowCell } from './cells/WallWithWindowCell';
@@ -14,7 +14,9 @@ interface CellMeshProps {
 
 export function CellMesh({ cell, toWorldPosition, lookup }: CellMeshProps) {
   const position = toWorldPosition(cell.x, cell.y, cell.z);
-  const isIsolated = isIsolatedBlock(lookup, cell);
+  // Une cellule est "tour" si elle-même ou n'importe quel étage au-dessus
+  // dans la même colonne est isolé — la forme cylindrique se propage vers le bas.
+  const isIsolated = isTowerColumn(lookup, cell);
 
   if (cell.type === 'ROOF') {
     return <RoofCell cell={cell} position={position} lookup={lookup} isIsolated={isIsolated} />;

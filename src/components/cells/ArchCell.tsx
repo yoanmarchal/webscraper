@@ -1,8 +1,9 @@
 import { RoundedBox } from '@react-three/drei';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { getArchAxis } from '../../utils/cellUtils';
+import { getArchAxis, getCornerRadii } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
+import { ShapedBox } from '../ShapedBox';
 
 interface ArchCellProps {
   cell: GridCell;
@@ -18,6 +19,12 @@ export function ArchCell({ cell, position, lookup }: ArchCellProps) {
   const darkStoneColor = varyColorBrightness(baseColor, -0.12);
   const accentStoneColor = varyColorBrightness(baseColor, -0.18);
   const lintelColor = varyColorBrightness(baseColor, -0.06);
+
+  // ── Shape inheritance: corner radii driven by neighbours ──────────────────
+  // For arches the radii apply along the span axis.
+  // We compute them in world space then un-rotate mentally – simpler to just
+  // pass them through to ShapedBox which operates in local (pre-rotation) space.
+  const radii = getCornerRadii(lookup, cell);
 
   // We design the arch locally along the X-axis (bridging X, opening facing Z).
   // If the environment dictates Z orientation, we rotate the parent group by 90 degrees.

@@ -2,6 +2,58 @@ import type { GridCell } from '../types';
 
 export type CellLookup = Record<string, GridCell>;
 
+// ── Shape inheritance system ─────────────────────────────────────────────────
+//
+// A cell's corners are rounded based on whether it has neighbours.
+// Each corner is identified by (dx, dz) = (±1, ±1).
+// A corner is "open" (rounded) when BOTH adjacent horizontal neighbours are absent.
+// A corner is "closed" (sharp, radius ≈ 0) when either adjacent neighbour exists.
+//
+// This gives naturally rounded towers for isolated blocks and squared-off
+// corners where cells join into a larger mass.
+
+export interface CornerRadii {
+  /** corner (-X, -Z) */
+  backLeft:   number;
+  /** corner (+X, -Z) */
+  backRight:  number;
+  /** corner (-X, +Z) */
+  frontLeft:  number;
+  /** corner (+X, +Z) */
+  frontRight: number;
+  /** convenience: max of all four (use for RoundedBox fallback) */
+  max: number;
+  /** true when all four corners have the same radius */
+  uniform: boolean;
+}
+
+const ROUNDED = 0.40;   // radius for an open (exposed) corner — très arrondi
+const SHARP   = 0.005;  // radius for a joined (interior) corner — quasi carré
+
+/**
+ * Returns per-corner radii for a cell based on its horizontal neighbours.
+ * Isolated cells get fully rounded corners (tower / pillar look).
+ * Cells in a group get sharp corners where they touch neighbours and
+ * rounded corners on their exposed extremities.
+ */
+export function getCornerRadii(lookup: CellLookup, cell: GridCell): CornerRadii {
+  const hasL = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
+  const hasR = hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z);
+  const hasF = hasOccupiedCell(lookup, cell.x,     cell.y, cell.z + 1);
+  const hasB = hasOccupiedCell(lookup, cell.x,     cell.y, cell.z - 1);
+
+  // A corner is rounded only when BOTH its adjacent sides are free
+  const backLeft   = (!hasL && !hasB) ? ROUNDED : SHARP;
+  const backRight  = (!hasR && !hasB) ? ROUNDED : SHARP;
+  const frontLeft  = (!hasL && !hasF) ? ROUNDED : SHARP;
+  const frontRight = (!hasR && !hasF) ? ROUNDED : SHARP;
+
+  const max = Math.max(backLeft, backRight, frontLeft, frontRight);
+  const uniform = backLeft === backRight && backRight === frontLeft && frontLeft === frontRight;
+
+  return { backLeft, backRight, frontLeft, frontRight, max, uniform };
+}
+
 export function cellKey(x: number, y: number, z: number): string {
   return `${x}:${y}:${z}`;
 }
@@ -79,4 +131,24 @@ export function isIsolatedBlock(lookup: CellLookup, cell: GridCell): boolean {
          !hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z) &&
          !hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1) &&
          !hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
+}
+
+/**
+ * Retourne true si cette cellule fait partie d'une colonne de tour ronde.
+ *
+ * Une colonne est "tour ronde" si n'importe quel étage de la colonne
+ * (depuis la cellule courante jusqu'au sommet) est isolé horizontalement.
+ * Cela propage la forme cylindrique vers le bas : si le sommet est une tour,
+ * tous les blocs en dessous dans la même colonne (x, z) le sont aussi.
+ */
+export function isTowerColumn(lookup: CellLookup, cell: GridCell): boolean {
+  // On remonte la colonne depuis y courant vers le haut
+  let y = cell.y;
+  while (true) {
+    const current = getCell(lookup, cell.x, y, cell.z);
+    if (!current?.isOccupied) break;          // fin de la colonne
+    if (isIsolatedBlock(lookup, current)) return true;  // un étage isolé trouvé
+    y += 1;
+  }
+  return false;
 }
