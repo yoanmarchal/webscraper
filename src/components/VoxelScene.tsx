@@ -4,6 +4,7 @@ import type { GridCell } from '../types';
 import { makeCellLookup } from '../utils/cellUtils';
 import { CellMesh } from './CellMesh';
 import { PlacementPreview } from './PlacementPreview';
+import { Bloom, EffectComposer, Noise, Vignette, SSAO   } from '@react-three/postprocessing'
 
 interface VoxelSceneProps {
   cells: GridCell[];
@@ -88,6 +89,12 @@ export function VoxelScene({
         getNextPlacementY={getNextPlacementY}
       />
       <OrbitControls enableDamping dampingFactor={0.08} maxPolarAngle={Math.PI / 2.08} minDistance={6} maxDistance={36} />
+      <EffectComposer>
+        <Bloom mipmapBlur  luminanceThreshold={0.3} luminanceSmoothing={0.9} height={300} />
+        <Noise opacity={0.02} />
+        <Vignette eskil={false} offset={0.1} darkness={0.5} />
+      </EffectComposer>
+
     </Canvas>
   );
 }
