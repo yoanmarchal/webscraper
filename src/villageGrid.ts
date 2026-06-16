@@ -1,5 +1,6 @@
-import { BlockType, type CellCoordinate, type GridCell } from './types';
+import { BlockType, type CellCoordinate, type GridCell, type PropertyBundle } from './types';
 import { type ColorPalette, getBuildingId, getPaletteByIndex, randomColorVariation } from './colorPalettes';
+import { PropertyInheritanceSystem } from './propertyInheritanceSystem';
 
 export class VillageGrid {
   private readonly sizeX: number;
@@ -7,6 +8,7 @@ export class VillageGrid {
   private readonly sizeZ: number;
   private readonly grid: GridCell[][][];
   private readonly buildingPalettes: Map<number, ColorPalette> = new Map();
+  private nextPlacementOrder: number = 0;
 
   constructor(sizeX: number, sizeY: number, sizeZ: number) {
     this.sizeX = sizeX;
@@ -20,7 +22,12 @@ export class VillageGrid {
       return;
     }
 
-    this.grid[x][y][z].isOccupied = true;
+    const cell = this.grid[x][y][z];
+    if (!cell.isOccupied) {
+      cell.placementOrder = this.nextPlacementOrder;
+      this.nextPlacementOrder += 1;
+      cell.isOccupied = true;
+    }
     this.recomputeProceduralLogic();
   }
 
@@ -44,7 +51,12 @@ export class VillageGrid {
       return null;
     }
 
-    this.grid[x][targetY][z].isOccupied = true;
+    const cell = this.grid[x][targetY][z];
+    if (!cell.isOccupied) {
+      cell.placementOrder = this.nextPlacementOrder;
+      this.nextPlacementOrder += 1;
+      cell.isOccupied = true;
+    }
     this.recomputeProceduralLogic();
     return targetY;
   }
@@ -57,6 +69,8 @@ export class VillageGrid {
     this.grid[x][y][z].isOccupied = false;
     this.grid[x][y][z].type = BlockType.Empty;
     this.grid[x][y][z].color = undefined;
+    this.grid[x][y][z].placementOrder = -1;
+    this.grid[x][y][z].propertyBundle = undefined;
     this.recomputeProceduralLogic();
   }
 
@@ -108,12 +122,15 @@ export class VillageGrid {
   }
 
   public clear(): void {
+    this.nextPlacementOrder = 0;
     for (let x = 0; x < this.sizeX; x += 1) {
       for (let y = 0; y < this.sizeY; y += 1) {
         for (let z = 0; z < this.sizeZ; z += 1) {
           this.grid[x][y][z].isOccupied = false;
           this.grid[x][y][z].type = BlockType.Empty;
           this.grid[x][y][z].color = undefined;
+          this.grid[x][y][z].placementOrder = -1;
+          this.grid[x][y][z].propertyBundle = undefined;
         }
       }
     }
@@ -184,7 +201,7 @@ export class VillageGrid {
       for (let y = 0; y < this.sizeY; y += 1) {
         grid[x][y] = [];
         for (let z = 0; z < this.sizeZ; z += 1) {
-          grid[x][y][z] = { x, y, z, isOccupied: false, type: BlockType.Empty };
+          grid[x][y][z] = { x, y, z, isOccupied: false, type: BlockType.Empty, placementOrder: -1 };
         }
       }
     }
@@ -193,6 +210,9 @@ export class VillageGrid {
   }
 
   private recomputeProceduralLogic(): void {
+    // Créer le système d'héritage de propriétés
+    const inheritanceSystem = new PropertyInheritanceSystem(this.grid, this.sizeX, this.sizeZ);
+
     for (let x = 0; x < this.sizeX; x += 1) {
       for (let y = 0; y < this.sizeY; y += 1) {
         for (let z = 0; z < this.sizeZ; z += 1) {
@@ -201,6 +221,7 @@ export class VillageGrid {
           if (!cell.isOccupied) {
             cell.type = BlockType.Empty;
             cell.color = undefined;
+            cell.propertyBundle = undefined;
             continue;
           }
 
@@ -262,7 +283,9 @@ export class VillageGrid {
             cell.type = BlockType.Wall;
           }
 
-          cell.color = this.getColorForCell(cell);
+          // Calculer le PropertyBundle après avoir déterminé le type
+          cell.propertyBundle = inheritanceSystem.computePropertyBundle(cell);
+          cell.color = cell.propertyBundle.color;
         }
       }
     }

@@ -13,6 +13,13 @@ interface WallWithWindowCellProps {
 }
 
 export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallWithWindowCellProps) {
+  // Debug: vérifier si la cellule a un propertyBundle
+  console.log(`WallWithWindowCell (${cell.x},${cell.y},${cell.z}) - has propertyBundle:`, !!cell.propertyBundle);
+  if (cell.propertyBundle) {
+    console.log(`WallWithWindowCell (${cell.x},${cell.y},${cell.z}) - decorationStyle:`, cell.propertyBundle.decorationStyle);
+    console.log(`WallWithWindowCell (${cell.x},${cell.y},${cell.z}) - mergeFlags:`, cell.propertyBundle.mergeFlags);
+  }
+
   const windowVariant = (cell.x + cell.z) % 3;
   const exposedFaces = getExposedFaces(lookup, cell);
 
@@ -42,13 +49,29 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   // ── Helpers – déclarés AVANT tout return conditionnel ────────────────────
 
   const renderQuoins = () => {
+    // Vérifier si le propertyBundle existe et si nous devons supprimer les quoins
+    if (cell.propertyBundle) {
+      const { mergeFlags } = cell.propertyBundle;
+
+      // Si tous les quoins sont supprimés, ne rien rendre
+      if (mergeFlags.suppressQuoin.backLeft && mergeFlags.suppressQuoin.backRight &&
+          mergeFlags.suppressQuoin.frontLeft && mergeFlags.suppressQuoin.frontRight) {
+        return null;
+      }
+    }
+
     const corners = [
-      { dx: -1, dz: -1 },
-      { dx:  1, dz: -1 },
-      { dx: -1, dz:  1 },
-      { dx:  1, dz:  1 },
+      { dx: -1, dz: -1, cornerName: 'backLeft' as const },
+      { dx:  1, dz: -1, cornerName: 'frontRight' as const },
+      { dx: -1, dz:  1, cornerName: 'frontLeft' as const },
+      { dx:  1, dz:  1, cornerName: 'backRight' as const },
     ];
-    return corners.map(({ dx, dz }, i) => {
+    return corners.map(({ dx, dz, cornerName }, i) => {
+      // Vérifier si ce quoin spécifique est supprimé
+      if (cell.propertyBundle?.mergeFlags.suppressQuoin[cornerName]) {
+        return null;
+      }
+
       const adj1 = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z);
       const adj2 = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + dz);
       const diag = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z + dz);
@@ -83,9 +106,16 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
   const renderStonePatches = () => {
     if (exposedFaces.length === 0) return null;
+
+    // Vérifier si le style décoratif permet les pierres apparentes
+    // Seule le style STONE devrait avoir des pierres apparentes
+    const hasStoneStyle = cell.propertyBundle?.decorationStyle === 'STONE';
+    if (!hasStoneStyle) return null;
+
+    // Pour le style STONE, toujours afficher les pierres décoratives
+    // Utiliser un hachage déterministe pour la position mais toujours afficher
     const hash1 = Math.abs(cell.x * 23 + cell.y * 37 + cell.z * 13) % 100;
     const hash2 = Math.abs(cell.x * 61 + cell.y * 29 + cell.z * 43) % 100;
-    if (hash1 > 40) return null;
 
     const face    = exposedFaces[hash2 % exposedFaces.length];
     const offsetX = ((hash1 % 10) / 10 - 0.5) * 0.4;
@@ -110,8 +140,22 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     );
   };
 
-  const renderBaseTrim = () =>
-    exposedFaces.map((face, index) => {
+  const renderBaseTrim = () => {
+    // Vérifier si nous devons supprimer toutes les plinthes
+    if (cell.propertyBundle) {
+      const { mergeFlags } = cell.propertyBundle;
+      if (mergeFlags.suppressBaseTrim.front && mergeFlags.suppressBaseTrim.back &&
+          mergeFlags.suppressBaseTrim.left && mergeFlags.suppressBaseTrim.right) {
+        return null;
+      }
+    }
+
+    return exposedFaces.map((face, index) => {
+      // Vérifier si cette face spécifique est supprimée
+      if (cell.propertyBundle?.mergeFlags.suppressBaseTrim[face]) {
+        return null;
+      }
+
       let pos: [number, number, number] = [0, -0.46, 0];
       let rot: [number, number, number] = [0, 0, 0];
       switch (face) {
@@ -128,6 +172,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         </mesh>
       );
     });
+  };
 
   // ── Porte ────────────────────────────────────────────────────────────────
   const createDoor = (rotation: number, key: string) => {
@@ -338,11 +383,11 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           color={cell.color ?? '#d0baa0'} roughness={0.94} castShadow receiveShadow />
 
         <mesh name="decorativeBandTop" position={[0, 0.35, 0]} castShadow>
-          <cylinderGeometry args={[0.52, 0.52, 0.05, 24]} />
+          <cylinderGeometry args={[0.52, 0.52, 0.05, 12]} />
           <meshStandardMaterial color="#9a8a70" roughness={0.9} />
         </mesh>
         <mesh name="decorativeBandBottom" position={[0, -0.35, 0]} castShadow>
-          <cylinderGeometry args={[0.52, 0.52, 0.05, 24]} />
+          <cylinderGeometry args={[0.52, 0.52, 0.05, 12]} />
           <meshStandardMaterial color="#9a8a70" roughness={0.9} />
         </mesh>
 

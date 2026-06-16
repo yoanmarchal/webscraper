@@ -13,9 +13,16 @@ interface StandardCellProps {
 }
 
 export function StandardCell({ cell, position, lookup, isIsolated }: StandardCellProps) {
+  // Debug: vérifier si la cellule a un propertyBundle
+  console.log(`StandardCell (${cell.x},${cell.y},${cell.z}) - has propertyBundle:`, !!cell.propertyBundle);
+  if (cell.propertyBundle) {
+    console.log(`StandardCell (${cell.x},${cell.y},${cell.z}) - decorationStyle:`, cell.propertyBundle.decorationStyle);
+    console.log(`StandardCell (${cell.x},${cell.y},${cell.z}) - mergeFlags:`, cell.propertyBundle.mergeFlags);
+  }
+
   const isFoundation = cell.type === 'FOUNDATION';
   const baseColor = cell.color ?? (isFoundation ? '#8d8a80' : '#c0b0a0');
-  
+
   const quoinColor = varyColorBrightness(baseColor, -0.12);
   const patchColor = varyColorBrightness(baseColor, -0.15);
   const trimColor = varyColorBrightness(baseColor, -0.08);
@@ -24,14 +31,30 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   const radii = getCornerRadii(lookup, cell);
 
   const renderQuoins = () => {
+    // Vérifier si le propertyBundle existe et si nous devons supprimer les quoins
+    if (cell.propertyBundle) {
+      const { mergeFlags } = cell.propertyBundle;
+
+      // Si tous les quoins sont supprimés, ne rien rendre
+      if (mergeFlags.suppressQuoin.backLeft && mergeFlags.suppressQuoin.backRight &&
+          mergeFlags.suppressQuoin.frontLeft && mergeFlags.suppressQuoin.frontRight) {
+        return null;
+      }
+    }
+
     const corners = [
-      { dx: -1, dz: -1 },
-      { dx: 1, dz: -1 },
-      { dx: -1, dz: 1 },
-      { dx: 1, dz: 1 },
+      { dx: -1, dz: -1, cornerName: 'backLeft' as const },
+      { dx: 1, dz: -1, cornerName: 'frontRight' as const },
+      { dx: -1, dz: 1, cornerName: 'frontLeft' as const },
+      { dx: 1, dz: 1, cornerName: 'backRight' as const },
     ];
 
-    return corners.map(({ dx, dz }, i) => {
+    return corners.map(({ dx, dz, cornerName }, i) => {
+      // Vérifier si ce quoin spécifique est supprimé
+      if (cell.propertyBundle?.mergeFlags.suppressQuoin[cornerName]) {
+        return null;
+      }
+
       // Un coin est exposé si au moins un des côtés adjacents n'est pas occupé
       const adj1 = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z);
       const adj2 = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + dz);
@@ -77,6 +100,17 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   const renderStonePatches = () => {
     const exposedFaces = getExposedFaces(lookup, cell);
     if (exposedFaces.length === 0) return null;
+
+    // Debug: vérifier le style décoratif
+    console.log(`Cell (${cell.x},${cell.y},${cell.z}) - DecorationStyle:`, cell.propertyBundle?.decorationStyle);
+
+    // Vérifier si le style décoratif permet les pierres apparentes
+    // Seule le style STONE devrait avoir des pierres apparentes
+    const hasStoneStyle = cell.propertyBundle?.decorationStyle === 'STONE';
+    if (!hasStoneStyle) {
+      console.log(`Cell (${cell.x},${cell.y},${cell.z}) - Pas de style STONE, pas de pierres apparentes`);
+      return null;
+    }
 
     // Calcul déterministe pour éviter les changements lors des re-rendus
     const hash1 = Math.abs(cell.x * 17 + cell.y * 31 + cell.z * 47) % 100;
@@ -126,11 +160,25 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   };
 
   const renderBaseTrim = () => {
+    // Vérifier si nous devons supprimer toutes les plinthes
+    if (cell.propertyBundle) {
+      const { mergeFlags } = cell.propertyBundle;
+      if (mergeFlags.suppressBaseTrim.front && mergeFlags.suppressBaseTrim.back &&
+          mergeFlags.suppressBaseTrim.left && mergeFlags.suppressBaseTrim.right) {
+        return null;
+      }
+    }
+
     const exposedFaces = getExposedFaces(lookup, cell);
     return exposedFaces.map((face, index) => {
+      // Vérifier si cette face spécifique est supprimée
+      if (cell.propertyBundle?.mergeFlags.suppressBaseTrim[face]) {
+        return null;
+      }
+
       let rotation: [number, number, number] = [0, 0, 0];
       let position: [number, number, number] = [0, -0.46, 0];
-      
+
       switch (face) {
         case 'front':
           position = [0, -0.46, 0.505];
@@ -164,7 +212,7 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   if (isIsolated) {
     return (
       <group name="standardCellIsolated" position={position}>
-        {/* Corps principal : cylindre circulaire (vraie tour ronde) */}
+        {/* Corps principal : cylindre moins rond pour plus de réalisme */}
         <ShapedBox
           args={[1.0, 1.0, 1.0]}
           radii={radii}
@@ -174,11 +222,11 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
           castShadow
           receiveShadow
         />
-        
-        {/* Éléments décoratifs : bande horizontale */}
+
+        {/* Éléments décoratifs : bande horizontale moins ronde */}
         {!isFoundation && (
           <mesh name="decorativeBandTop" position={[0, 0.455, 0]}>
-            <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.5} smoothness={8} castShadow>
+            <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.2} smoothness={4} castShadow>
               <meshStandardMaterial color="#9a8a70" roughness={0.9} />
             </RoundedBox>
           </mesh>
@@ -219,14 +267,14 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       {!isFoundation && renderBaseTrim()}
 
       {/* Corniche horizontale sur les murs (pas sur les fondations) */}
-      {!isFoundation && (
+      {!isFoundation && !cell.propertyBundle?.mergeFlags.suppressCornice && (
         <>
           <mesh name='cornicheTop' position={[0, 0.46, 0]}>
             <RoundedBox args={[1.04, 0.06, 1.04]} radius={0.02} smoothness={4} castShadow receiveShadow>
               <meshStandardMaterial color="#d8c8ae" roughness={0.86} />
             </RoundedBox>
           </mesh>
-          <mesh name='cornicheMiddle' position={[0, 0.38, 0]}>
+          <mesh name='corniceMiddle' position={[0, 0.38, 0]}>
             <RoundedBox args={[1.02, 0.04, 1.02]} radius={0.01} smoothness={4} castShadow>
               <meshStandardMaterial color="#c8b89e" roughness={0.88} />
             </RoundedBox>
