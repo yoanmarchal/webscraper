@@ -210,7 +210,7 @@ export class VillageGrid {
   }
 
   private recomputeProceduralLogic(): void {
-    // Créer le système d'héritage de propriétés
+    // Créer le système d'héritage de propriétés simplifié
     const inheritanceSystem = new PropertyInheritanceSystem(this.grid, this.sizeX, this.sizeZ);
 
     for (let x = 0; x < this.sizeX; x += 1) {
@@ -232,63 +232,72 @@ export class VillageGrid {
           const cellFront = this.getNeighborCell(x, y, z - 1);
           const cellBack = this.getNeighborCell(x, y, z + 1);
 
-          const horizontalNeighbors = [cellLeft, cellRight, cellFront, cellBack].filter(
-            (neighbor): neighbor is GridCell => neighbor !== null && neighbor.isOccupied,
-          );
+          const hasLeftNeighbor = cellLeft?.isOccupied ?? false;
+          const hasRightNeighbor = cellRight?.isOccupied ?? false;
+          const hasFrontNeighbor = cellFront?.isOccupied ?? false;
+          const hasBackNeighbor = cellBack?.isOccupied ?? false;
 
-          const horizontalNeighborCount = horizontalNeighbors.length;
-
-          const oppositePairs = [
-            cellLeft?.isOccupied && cellRight?.isOccupied ? 1 : 0,
-            cellFront?.isOccupied && cellBack?.isOccupied ? 1 : 0,
-          ].reduce((sum, value) => sum + value, 0);
+          const horizontalNeighborCount = [hasLeftNeighbor, hasRightNeighbor, hasFrontNeighbor, hasBackNeighbor]
+            .filter(Boolean).length;
 
           const isTopMost = !cellAbove?.isOccupied;
           const hasSupportBelow = cellBelow?.isOccupied ?? false;
 
-          const hasTallerOppositeNeighbor =
-            (cellLeft?.isOccupied && this.getNeighborCell(x - 1, y + 1, z)?.isOccupied) ||
-            (cellRight?.isOccupied && this.getNeighborCell(x + 1, y + 1, z)?.isOccupied) ||
-            (cellFront?.isOccupied && this.getNeighborCell(x, y + 1, z - 1)?.isOccupied) ||
-            (cellBack?.isOccupied && this.getNeighborCell(x, y + 1, z + 1)?.isOccupied);
-
-          const isArch =
-            horizontalNeighbors.length === 2 &&
-            oppositePairs === 1 &&
-            (!hasSupportBelow || hasTallerOppositeNeighbor) &&
-            // Un arche ne peut pas être au même niveau qu'un toit adjacent :
-            // ses deux voisins porteurs doivent avoir au moins un étage au-dessus
-            horizontalNeighbors.every(
-              (n) => this.getNeighborCell(n.x, n.y + 1, n.z)?.isOccupied === true,
-            );
+          // Logique simplifiée pour les arches
+          const isArch = this.isSimpleArch(x, y, z, hasLeftNeighbor, hasRightNeighbor, hasFrontNeighbor, hasBackNeighbor);
 
           if (y === 0) {
-            // Au sol : fondation solide sauf si des faces sont exposées → WallWithWindow
-            const hasExposedFace =
-              !cellLeft?.isOccupied ||
-              !cellRight?.isOccupied ||
-              !cellFront?.isOccupied ||
-              !cellBack?.isOccupied;
+            // Au sol : fondation ou mur avec fenêtre selon les faces exposées
+            const hasExposedFace = !hasLeftNeighbor || !hasRightNeighbor || !hasFrontNeighbor || !hasBackNeighbor;
             cell.type = hasExposedFace ? BlockType.WallWithWindow : BlockType.Foundation;
           } else if (isArch) {
             cell.type = BlockType.Arch;
           } else if (isTopMost) {
-            // Any topmost block of a column (not a foundation or arch) is a roof
+            // Bloc le plus haut d'une colonne → toit
             cell.type = BlockType.Roof;
-          } else if (horizontalNeighbors.length < 4) {
-            // Below the roof, visible facades (less than 4 neighbors) get windows
+          } else if (horizontalNeighborCount < 4) {
+            // Murs avec fenêtres pour les façades visibles
             cell.type = BlockType.WallWithWindow;
           } else {
-            // Fully enclosed interior blocks are solid walls
+            // Murs pleins pour les intérieurs
             cell.type = BlockType.Wall;
           }
 
-          // Calculer le PropertyBundle après avoir déterminé le type
+          // Calculer le PropertyBundle simplifié
           cell.propertyBundle = inheritanceSystem.computePropertyBundle(cell);
           cell.color = cell.propertyBundle.color;
         }
       }
     }
+  }
+
+  private isSimpleArch(x: number, y: number, z: number,
+                     hasLeft: boolean, hasRight: boolean,
+                     hasFront: boolean, hasBack: boolean): boolean {
+    // Logique d'arche simplifiée : deux voisins opposés, pas de support en dessous ou voisins plus hauts
+    const oppositePairs = (
+      (hasLeft && hasRight) ? 1 : 0
+    ) + (
+      (hasFront && hasBack) ? 1 : 0
+    );
+
+    if (oppositePairs !== 1) return false;
+
+    const hasSupportBelow = this.getNeighborCell(x, y - 1, z)?.isOccupied ?? false;
+    if (hasSupportBelow) return false;
+
+    // Vérifier que les voisins porteurs ont au moins un étage au-dessus
+    if (hasLeft && hasRight) {
+      const leftHasAbove = this.getNeighborCell(x - 1, y + 1, z)?.isOccupied ?? false;
+      const rightHasAbove = this.getNeighborCell(x + 1, y + 1, z)?.isOccupied ?? false;
+      return leftHasAbove && rightHasAbove;
+    } else if (hasFront && hasBack) {
+      const frontHasAbove = this.getNeighborCell(x, y + 1, z - 1)?.isOccupied ?? false;
+      const backHasAbove = this.getNeighborCell(x, y + 1, z + 1)?.isOccupied ?? false;
+      return frontHasAbove && backHasAbove;
+    }
+
+    return false;
   }
 
   private getBuildingPalette(x: number, z: number): ColorPalette {

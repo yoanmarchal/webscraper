@@ -8,18 +8,14 @@ export enum BlockType {
 }
 
 export enum DecorationStyle {
-  PLAIN = 'PLAIN',
-  STONE = 'STONE',
-  TOWER = 'TOWER',
+  Standard = 'STANDARD',
 }
 
 export type Corner = 'backLeft' | 'backRight' | 'frontLeft' | 'frontRight';
 export type Face = 'front' | 'back' | 'left' | 'right';
 
 export interface MergeFlags {
-  suppressCornice: boolean;
-  suppressQuoin: Record<Corner, boolean>;
-  suppressBaseTrim: Record<Face, boolean>;
+  mergeWithNeighbors: boolean;
 }
 
 export interface PropertyBundle {
