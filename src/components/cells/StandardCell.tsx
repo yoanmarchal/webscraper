@@ -1,5 +1,5 @@
 import { RoundedBox } from '@react-three/drei';
-import type { GridCell } from '../../types';
+import type { GridCell, ProtectedArea, ProtectedAreasConfig } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { hasOccupiedCell, getExposedFaces, getCornerRadii } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
@@ -13,13 +13,6 @@ interface StandardCellProps {
 }
 
 export function StandardCell({ cell, position, lookup, isIsolated }: StandardCellProps) {
-  // Debug: vérifier si la cellule a un propertyBundle
-  console.log(`StandardCell (${cell.x},${cell.y},${cell.z}) - has propertyBundle:`, !!cell.propertyBundle);
-  if (cell.propertyBundle) {
-    console.log(`StandardCell (${cell.x},${cell.y},${cell.z}) - decorationStyle:`, cell.propertyBundle.decorationStyle);
-    console.log(`StandardCell (${cell.x},${cell.y},${cell.z}) - mergeFlags:`, cell.propertyBundle.mergeFlags);
-  }
-
   const isFoundation = cell.type === 'FOUNDATION';
   const baseColor = cell.color ?? (isFoundation ? '#8d8a80' : '#c0b0a0');
 
@@ -118,7 +111,7 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
      * Les quoins sont positionnés aux coins : (±0.42, ±0.46) et (±0.46, ±0.42)
      * avec des tailles de 0.16×0.18×0.08 et 0.08×0.18×0.16
      */
-    const PROTECTED_AREAS = {
+    const PROTECTED_AREAS: ProtectedAreasConfig = {
       // Zones des coins sur chaque face
       // Pour chaque coin, on protège une zone autour
       corner: { marginX: 0.12, marginY: 0.12 },
@@ -142,33 +135,26 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       stoneWidth: number,
       stoneHeight: number
     ): boolean => {
-      // Vérifier les coins de la face
-      // Sur chaque face (qui va de -0.5 à 0.5 en x et y),
-      // les coins sont aux extrémités : (-0.5, -0.5), (-0.5, 0.5), (0.5, -0.5), (0.5, 0.5)
+      const cornerArea = PROTECTED_AREAS.corner;
+      const cornerMarginX = cornerArea.marginX!;
+      const cornerMarginY = cornerArea.marginY;
       
-      const cornerMarginX = PROTECTED_AREAS.corner.marginX;
-      const cornerMarginY = PROTECTED_AREAS.corner.marginY;
+      // Coordonnées des 4 coins de la face (normalisés à -0.5..0.5)
+      const CORNERS: [number, number][] = [
+        [-0.5, 0.5],   // Haut-gauche
+        [0.5, 0.5],    // Haut-droite
+        [-0.5, -0.5],  // Bas-gauche
+        [0.5, -0.5],   // Bas-droite
+      ];
       
-      // Calculer la distance du bord de la pierre au coin
-      // Coin haut-gauche (-0.5, 0.5)
-      const distToTL_X = Math.abs(x - (-0.5)) - stoneWidth / 2;
-      const distToTL_Y = Math.abs(y - 0.5) - stoneHeight / 2;
-      if (distToTL_X < cornerMarginX && distToTL_Y < cornerMarginY) return true;
-      
-      // Coin haut-droite (0.5, 0.5)
-      const distToTR_X = Math.abs(x - 0.5) - stoneWidth / 2;
-      const distToTR_Y = Math.abs(y - 0.5) - stoneHeight / 2;
-      if (distToTR_X < cornerMarginX && distToTR_Y < cornerMarginY) return true;
-      
-      // Coin bas-gauche (-0.5, -0.5)
-      const distToBL_X = Math.abs(x - (-0.5)) - stoneWidth / 2;
-      const distToBL_Y = Math.abs(y - (-0.5)) - stoneHeight / 2;
-      if (distToBL_X < cornerMarginX && distToBL_Y < cornerMarginY) return true;
-      
-      // Coin bas-droite (0.5, -0.5)
-      const distToBR_X = Math.abs(x - 0.5) - stoneWidth / 2;
-      const distToBR_Y = Math.abs(y - (-0.5)) - stoneHeight / 2;
-      if (distToBR_X < cornerMarginX && distToBR_Y < cornerMarginY) return true;
+      // Vérifier chaque coin
+      for (const [cornerX, cornerY] of CORNERS) {
+        const distX = Math.abs(x - cornerX) - stoneWidth / 2;
+        const distY = Math.abs(y - cornerY) - stoneHeight / 2;
+        if (distX < cornerMarginX && distY < cornerMarginY) {
+          return true;
+        }
+      }
       
       // Vérifier la zone de la base trim (en bas)
       const baseArea = PROTECTED_AREAS.baseTrim;

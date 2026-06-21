@@ -1,5 +1,5 @@
 import { RoundedBox } from '@react-three/drei';
-import type { GridCell } from '../../types';
+import type { GridCell, ProtectedAreasConfig } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { getExposedFaces, getCornerRadii, hasOccupiedCell } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
@@ -13,7 +13,6 @@ interface WallWithWindowCellProps {
 }
 
 export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallWithWindowCellProps) {
-  const windowVariant = (cell.x + cell.z) % 2; // Simplifié à 2 variantes
   const exposedFaces = getExposedFaces(lookup, cell);
 
   const baseColor = cell.color ?? '#e0c996';
@@ -74,7 +73,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
      * Ces marges empêchent les pierres de se superposer aux éléments fonctionnels
      * Les marges sont calculées comme la moitié de la taille de l'élément + une marge de sécurité
      */
-    const PROTECTED_AREAS = {
+    const PROTECTED_AREAS: ProtectedAreasConfig = {
       // Fenêtre : cadre 0.6x0.5, vitre 0.54x0.44 → zone à protéger : ~0.35x0.27
       window: { marginX: 0.32, marginY: 0.27, centerX: 0, centerY: 0 },
       // Porte : cadre 0.48x0.8, panneau 0.4x0.7, centrée à y≈-0.10 → zone : ~0.24x0.40
@@ -152,9 +151,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     const stonesPerFace = 3 + (Math.abs(cell.x * 3 + cell.z * 7) % 3);
 
     exposedFaces.forEach((face, faceIdx) => {
-      // La face porte n'a que des pierres en bordure (pas au centre)
-      const isDoorFace = face === doorFace;
-
       for (let i = 0; i < stonesPerFace; i++) {
         const seed = Math.abs(cell.x * 7 + cell.y * 11 + cell.z * 13 + faceIdx * 23 + i * 17);
         const h1 = seed % 100;
@@ -170,14 +166,15 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         const signX = (quadrant === 0 || quadrant === 2) ? -1 : 1;
         const signY = (quadrant === 0 || quadrant === 1) ? -1 : 1;
 
-        // Pour la face porte, restreindre davantage la zone centrale
-        const minDist = isDoorFace ? 0.28 : 0.20;
+        // Distance minimale pour éviter le centre
+        const minDist = 0.20;
         const distX = minDist + (h1 % 18) * 0.01;
-        const distY = (isDoorFace ? 0.25 : 0.18) + (h2 % 16) * 0.01;
+        const distY = 0.18 + (h2 % 16) * 0.01;
         const offsetX = signX * distX;
         const offsetY = signY * distY;
 
         // Vérifier si cette pierre est dans une zone protégée
+        // (fenêtre, porte ou meurtrière selon le contexte)
         if (isInProtectedZone(face, offsetX, offsetY, w, h)) {
           continue; // Sauter cette pierre
         }
