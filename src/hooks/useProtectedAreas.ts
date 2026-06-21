@@ -49,7 +49,7 @@ export function useProtectedAreas(
         if (area) {
           const closestX = Math.abs(x - (area.centerX ?? 0)) - stoneWidth / 2;
           const closestY = Math.abs(y - (area.centerY ?? 0)) - stoneHeight / 2;
-          return closestX < area.marginX && closestY < area.marginY;
+          return closestX < (area.marginX ?? 0) && closestY < area.marginY;
         }
         return false;
       }

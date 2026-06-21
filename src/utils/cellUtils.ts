@@ -1,4 +1,5 @@
 import type { GridCell } from '../types';
+import { EDGE_R, FLAT_LIMIT } from '../config/protectedAreasConfig';
 
 export type CellLookup = Record<string, GridCell>;
 
@@ -106,10 +107,16 @@ export function getArchAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
   const eastWest = Number(hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z)) + Number(hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z));
   const northSouth = Number(hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1)) + Number(hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1));
 
-  if (eastWest >= northSouth) {
+  // Si plus de voisins sur l'axe X, l'arche doit être orientée selon Z (pour enjambée l'axe X)
+  // Si plus de voisins sur l'axe Z, l'arche doit être orientée selon X (pour enjambée l'axe Z)
+  if (eastWest > northSouth) {
+    return 'z';
+  }
+  if (northSouth > eastWest) {
     return 'x';
   }
-
+  
+  // Si égal, choisir en fonction de la position pour une cohérence visuelle
   return 'z';
 }
 
@@ -157,11 +164,8 @@ export function isTowerColumn(lookup: CellLookup, cell: GridCell): boolean {
 // Utilitaires de géométrie pour la projection sur les faces arrondies
 // =============================================================================
 
-/** Rayon des arcs de coin (utilisé dans ShapedBox) */
-export const EDGE_R = 0.18;
-
-/** Limite de la zone plate : 0.5 - EDGE_R = 0.32 */
-export const FLAT_LIMIT = 0.5 - EDGE_R;
+// Ré-exporter pour maintenir la compatibilité avec les imports existants
+export { EDGE_R, FLAT_LIMIT };
 
 /**
  * Projette un point latéral t sur la surface réelle d'une face,

@@ -3,18 +3,81 @@
  * pour éviter les superpositions entre éléments décoratifs.
  * 
  * Ces valeurs définissent les marges de sécurité autour des éléments fonctionnels
- * (fenêtres, portes, meurtrières, quoins, base trim) où les stone patches ne doivent pas être placés.
+ * (fenêtres, portes, meurtrières, quoins, base trim, decorative bands) où les stone patches ne doivent pas être placés.
  */
 
-import type { ProtectedAreasConfig } from '../types';
+import type { ProtectedArea, ProtectedAreasConfig } from '../types';
 
 // Valeur du rayon des coins arrondis (utilisée dans ShapedBox)
 export const EDGE_R = 0.18;
 export const FLAT_LIMIT = 0.5 - EDGE_R; // 0.32
 
 /**
+ * Coordonnées des 4 coins d'une face (normalisées à -0.5..0.5)
+ * Utilisées pour vérifier les superpositions avec les quoins
+ */
+export const FACE_CORNERS: [number, number][] = [
+  [-0.5, 0.5],   // Haut-gauche
+  [0.5, 0.5],    // Haut-droite
+  [-0.5, -0.5],  // Bas-gauche
+  [0.5, -0.5],   // Bas-droite
+];
+
+/**
+ * Vérifie si une position (x, y) sur une face est dans une zone protégée spécifique
+ */
+export function isInProtectedArea(
+  area: ProtectedArea,
+  x: number,
+  y: number,
+  stoneWidth: number,
+  stoneHeight: number
+): boolean {
+  const closestX = Math.abs(x - (area.centerX ?? 0)) - stoneWidth / 2;
+  const closestY = Math.abs(y - (area.centerY ?? 0)) - stoneHeight / 2;
+  return closestX < (area.marginX ?? 0) && closestY < area.marginY;
+}
+
+/**
+ * Vérifie si une position (x, y) est dans l'une des zones protégées de la configuration
+ */
+export function checkInProtectedZones(
+  protectedAreas: ProtectedAreasConfig,
+  x: number,
+  y: number,
+  stoneWidth: number,
+  stoneHeight: number
+): boolean {
+  for (const [areaKey, area] of Object.entries(protectedAreas)) {
+    // Pour les zones de coins (spéciales)
+    if (areaKey === 'corner') {
+      const cornerMarginX = area.marginX ?? 0;
+      const cornerMarginY = area.marginY;
+      
+      for (const [cornerX, cornerY] of FACE_CORNERS) {
+        const distX = Math.abs(x - cornerX) - stoneWidth / 2;
+        const distY = Math.abs(y - cornerY) - stoneHeight / 2;
+        if (distX < cornerMarginX && distY < cornerMarginY) {
+          return true;
+        }
+      }
+    } else {
+      // Pour les zones centrales (fenêtres, portes, etc.)
+      if (isInProtectedArea(area, x, y, stoneWidth, stoneHeight)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Rayon des corps principaux (tours et murs) pour les decorative bands
+export const TOWER_RADIUS = 0.5;
+export const WALL_RADIUS = 0.5;
+
+/**
  * Zones protégées pour WallWithWindowCell
- * Protège les fenêtres, portes et meurtrières contre les superpositions avec les stone patches
+ * Protège les fenêtres, portes, meurtrières et decorative bands contre les superpositions avec les stone patches
  */
 export const WINDOW_PROTECTED_AREAS: ProtectedAreasConfig = {
   // Fenêtre : cadre 0.6×0.5, vitre 0.54×0.44
@@ -32,11 +95,21 @@ export const WINDOW_PROTECTED_AREAS: ProtectedAreasConfig = {
   // Demi-largeur = 0.07, demi-hauteur = 0.20
   // Marge : 0.09 × 0.23
   arrowSlit: { marginX: 0.09, marginY: 0.23, centerX: 0, centerY: 0 },
+  
+  // Decorative Band Top : bande circulaire à y=0.35, radius=0.505, height=0.06
+  // Zone à protéger : marge pour éviter les superpositions avec les pierres
+  // Note : Les pierres sont décalées de 0.015, donc elles sont à 0.515 (au-dessus de 0.505)
+  // Cette zone protège le band lui-même
+  bandTop: { marginX: 0.40, marginY: 0.03, centerX: 0, centerY: 0.35 },
+  
+  // Decorative Band Bottom : bande circulaire à y=-0.35, radius=0.505, height=0.06
+  // Zone à protéger : marge pour éviter les superpositions avec les pierres
+  bandBottom: { marginX: 0.40, marginY: 0.03, centerX: 0, centerY: -0.35 },
 };
 
 /**
  * Zones protégées pour StandardCell
- * Protège les quoins (coins) et la base trim contre les superpositions avec les stone patches
+ * Protège les quoins (coins), la base trim et les decorative bands contre les superpositions avec les stone patches
  */
 export const STANDARD_PROTECTED_AREAS: ProtectedAreasConfig = {
   // Zones des coins : protège une zone carrée autour de chaque coin
@@ -48,15 +121,13 @@ export const STANDARD_PROTECTED_AREAS: ProtectedAreasConfig = {
   // Hauteur de la base trim : 0.08
   // Marge verticale de 0.10 pour éviter les superpositions
   baseTrim: { marginY: 0.10, centerY: -0.46 },
+  
+  // Decorative Band Top : bande horizontale à y=0.455, taille 1.05×0.08×1.05
+  // Marge verticale pour éviter les superpositions avec les stone patches
+  // Hauteur : 0.08, donc marge verticale de 0.10
+  bandTop: { marginX: 0.05, marginY: 0.10, centerX: 0, centerY: 0.455 },
+  
+  // Decorative Band Bottom : bande horizontale à y=-0.455 (symétrique du bandTop)
+  // Même configuration que bandTop mais en bas
+  bandBottom: { marginX: 0.05, marginY: 0.10, centerX: 0, centerY: -0.455 },
 };
-
-/**
- * Coordonnées des 4 coins d'une face (normalisées à -0.5..0.5)
- * Utilisées pour vérifier les superpositions avec les quoins
- */
-export const FACE_CORNERS: [number, number][] = [
-  [-0.5, 0.5],   // Haut-gauche
-  [0.5, 0.5],    // Haut-droite
-  [-0.5, -0.5],  // Bas-gauche
-  [0.5, -0.5],   // Bas-droite
-];

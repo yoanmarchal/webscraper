@@ -10,7 +10,7 @@ import {
 } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
-import { STANDARD_PROTECTED_AREAS, FACE_CORNERS } from '../../config/protectedAreasConfig';
+import { STANDARD_PROTECTED_AREAS, checkInProtectedZones } from '../../config/protectedAreasConfig';
 
 interface StandardCellProps {
   cell: GridCell;
@@ -105,19 +105,14 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
     const hasStoneStyle = cell.propertyBundle?.decorationStyle === 'STONE';
     if (!hasStoneStyle) return null;
 
-    const stones: JSX.Element[] = [];
+    const stones: any[] = [];
 
     // Utiliser la configuration centralisée des zones protégées
     const PROTECTED_AREAS = STANDARD_PROTECTED_AREAS;
 
     /**
      * Vérifie si une position (x, y) sur une face est dans une zone protégée
-     * @param face - La face concernée
-     * @param x - Position horizontale sur la face (-0.5 à 0.5)
-     * @param y - Position verticale sur la face (-0.5 à 0.5)
-     * @param stoneWidth - Largeur de la pierre
-     * @param stoneHeight - Hauteur de la pierre
-     * @returns true si la pierre chevauche une zone protégée
+     * Utilise la fonction centralisée checkInProtectedZones
      */
     const isInProtectedZone = (
       face: string,
@@ -126,26 +121,7 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       stoneWidth: number,
       stoneHeight: number
     ): boolean => {
-      const cornerArea = PROTECTED_AREAS.corner;
-      const cornerMarginX = cornerArea.marginX!;
-      const cornerMarginY = cornerArea.marginY;
-      
-      // Coordonnées des 4 coins de la face (normalisés à -0.5..0.5)
-      // Vérifier chaque coin de la face
-      for (const [cornerX, cornerY] of FACE_CORNERS) {
-        const distX = Math.abs(x - cornerX) - stoneWidth / 2;
-        const distY = Math.abs(y - cornerY) - stoneHeight / 2;
-        if (distX < cornerMarginX && distY < cornerMarginY) {
-          return true;
-        }
-      }
-      
-      // Vérifier la zone de la base trim (en bas)
-      const baseArea = PROTECTED_AREAS.baseTrim;
-      const closestY_Base = Math.abs(y - baseArea.centerY) - stoneHeight / 2;
-      if (closestY_Base < baseArea.marginY) return true;
-      
-      return false;
+      return checkInProtectedZones(PROTECTED_AREAS, x, y, stoneWidth, stoneHeight);
     };
 
     // Taille de base des pierres
@@ -354,11 +330,15 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
           receiveShadow
         />
 
-        {/* Éléments décoratifs : bande horizontale moins ronde */}
+        {/* Éléments décoratifs : bande horizontale avec meilleur arrondi et visibilité */}
         {!isFoundation && (
           <mesh name="decorativeBandTop" position={[0, 0.455, 0]}>
-            <RoundedBox args={[1.05, 0.04, 1.05]} radius={0.2} smoothness={4} castShadow>
-              <meshStandardMaterial color="#9a8a70" roughness={0.9} />
+            <RoundedBox args={[1.05, 0.08, 1.05]} radius={0.25} smoothness={8} castShadow>
+              <meshStandardMaterial 
+                color={varyColorBrightness(baseColor, -0.25)} 
+                roughness={0.65} 
+                metalness={0.15}
+              />
             </RoundedBox>
           </mesh>
         )}

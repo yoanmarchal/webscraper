@@ -11,7 +11,7 @@ import {
 } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
-import { WINDOW_PROTECTED_AREAS } from '../../config/protectedAreasConfig';
+import { WINDOW_PROTECTED_AREAS, isInProtectedArea } from '../../config/protectedAreasConfig';
 
 interface WallWithWindowCellProps {
   cell: GridCell;
@@ -33,6 +33,9 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
   // Calculer le radius moyen du bloc pour l'utiliser dans tous les éléments
   const avgRadius = (radii.backLeft + radii.backRight + radii.frontLeft + radii.frontRight) / 4;
+
+  // Rayons pour les stone patches sur les tours (doit être déclaré avant renderStonePatches)
+  const towerStoneRadius = 0.53; // Radius pour les pierres (au-dessus du decorative band à 0.515)
 
   // Déterminer le contexte du bloc pour adapter les décorations murales
   const hasLeftNeighbor = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
@@ -66,10 +69,10 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   };
 
   // ── Pierres apparentes (toujours présentes sauf sur les toits) ─────────────────
-  const renderStonePatches = () => {
+  const renderStonePatches = (hasBands: boolean, renderContext: 'tower' | 'wall' = 'wall') => {
     if (exposedFaces.length === 0) return null;
 
-    const stones: JSX.Element[] = [];
+    const stones: any[] = [];
     const stoneColor = varyColorBrightness(baseColor, -0.25);
 
     // Utiliser la configuration centralisée des zones protégées
@@ -77,12 +80,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
     /**
      * Vérifie si une position (x, y) sur une face est dans une zone protégée
-     * @param face - La face concernée
-     * @param x - Position horizontale sur la face (-0.5 à 0.5)
-     * @param y - Position verticale sur la face (-0.5 à 0.5)
-     * @param stoneWidth - Largeur de la pierre
-     * @param stoneHeight - Hauteur de la pierre
-     * @returns true si la pierre chevauche une zone protégée
+     * Utilise la fonction centralisée isInProtectedArea
      */
     const isInProtectedZone = (
       face: string,
@@ -91,24 +89,28 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       stoneWidth: number,
       stoneHeight: number
     ): boolean => {
-      let area;
-      
       // Déterminer quel élément est sur cette face
+      let area = PROTECTED_AREAS.window; // par défaut
       if (face === doorFace) {
-        // Face avec porte
         area = PROTECTED_AREAS.door;
       } else if (isIsolated) {
-        // Pour les tours isolées, toutes les faces exposées ont des meurtrières
         area = PROTECTED_AREAS.arrowSlit;
-      } else {
-        // Pour les murs standards, les faces exposées (non-porte) ont des fenêtres
-        area = PROTECTED_AREAS.window;
       }
-
-      // Vérifier si le coin de la pierre le plus proche du centre est dans la zone protégée
-      const closestX = Math.abs(x) - stoneWidth / 2;
-      const closestY = Math.abs(y - area.centerY) - stoneHeight / 2;
-      return closestX < area.marginX && closestY < area.marginY;
+      
+      // Vérifier l'élément principal (fenêtre, porte, meurtrière)
+      if (isInProtectedArea(area, x, y, stoneWidth, stoneHeight)) {
+        return true;
+      }
+      
+      // Vérifier les decorative bands (toujours présentes)
+      if (isInProtectedArea(PROTECTED_AREAS.bandTop, x, y, stoneWidth, stoneHeight)) {
+        return true;
+      }
+      if (isInProtectedArea(PROTECTED_AREAS.bandBottom, x, y, stoneWidth, stoneHeight)) {
+        return true;
+      }
+      
+      return false;
     };
 
     // Taille de base des pierres
@@ -163,12 +165,13 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           // Signe selon la face pour cohérence directionnelle
           const lateralSign = (face === 'back' || face === 'right') ? -1 : 1;
 
-          const towerRadius = 0.502;
-          const safeT = Math.max(-towerRadius * 0.95, Math.min(towerRadius * 0.95, offsetX));
-          const angle = baseFaceAngle + lateralSign * Math.asin(safeT / towerRadius);
+          // Les pierres sont placées sur un cylindre légèrement plus grand (0.51)
+          // pour être au-dessus des decorative bands (radius 0.505)
+          const safeT = Math.max(-towerStoneRadius * 0.95, Math.min(towerStoneRadius * 0.95, offsetX));
+          const angle = baseFaceAngle + lateralSign * Math.asin(safeT / towerStoneRadius);
 
-          const posX = Math.sin(angle) * towerRadius;
-          const posZ = Math.cos(angle) * towerRadius;
+          const posX = Math.sin(angle) * towerStoneRadius;
+          const posZ = Math.cos(angle) * towerStoneRadius;
           const rotY = angle;
 
           stones.push(
@@ -187,31 +190,37 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           );
         } else {
           // ── Mur avec coins éventuellement arrondis ────────────────────────
+          // Offset radial pour placer les pierres au-dessus des decorative bands
+          // Decorative band radius = 0.505, pierre épaisseur = 0.025 (demi = 0.0125)
+          // Pour éviter la superposition : 0.5 + offset + 0.0125 > 0.505
+          // → offset > 0.505 - 0.5 - 0.0125 = 0.0025
+          // Avec une marge de sécurité, utilisons offset = 0.015
+          const stoneOffset = 0.015; // Décalage vers l'extérieur
           let pos: [number, number, number] = [0, 0, 0];
           let rot: [number, number, number] = [0, 0, 0];
 
           switch (face) {
             case 'front': {
               const { surfaceZ, rotY } = projectOnFace(offsetX, radii.frontLeft > 0.01, radii.frontRight > 0.01);
-              pos = [offsetX, offsetY, surfaceZ + 0.003];
+              pos = [offsetX, offsetY, surfaceZ + stoneOffset];
               rot = [0, rotY, 0];
               break;
             }
             case 'back': {
               const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft > 0.01, radii.backRight > 0.01);
-              pos = [offsetX, offsetY, -(surfaceZ + 0.003)];
+              pos = [offsetX, offsetY, -(surfaceZ + stoneOffset)];
               rot = [0, Math.PI - rotY, 0];
               break;
             }
             case 'left': {
               const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft > 0.01, radii.frontLeft > 0.01);
-              pos = [-(surfaceZ + 0.003), offsetY, offsetX];
+              pos = [-(surfaceZ + stoneOffset), offsetY, offsetX];
               rot = [0, Math.PI / 2 + rotY, 0];
               break;
             }
             case 'right': {
               const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backRight > 0.01, radii.frontRight > 0.01);
-              pos = [surfaceZ + 0.003, offsetY, offsetX];
+              pos = [surfaceZ + stoneOffset, offsetY, offsetX];
               rot = [0, -(Math.PI / 2 + rotY), 0];
               break;
             }
@@ -354,25 +363,34 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
      // Pour les tours, utiliser le même radius que le corps principal (0.5 pour un bloc 1x1x1)
      // Le ShapedBox avec isIsolated=true crée un cylindre de radius w/2 = 0.5
      const towerBodyRadius = 0.5; // Correspond au radius du cylindre principal
-     const towerDecoSegments = 24; // Même nombre de segments que le corps principal
+     const towerDecoRadius = towerBodyRadius * 1.03; // 3% plus grand (0.515) pour être légèrement visible
+     const towerDecoSegments = 32; // Plus de segments pour un meilleur arrondi
 
      return (
        <group name="wallWithWindowCell" position={position}>
          <ShapedBox args={[1.0, 1.0, 1.0]} radii={radii} isIsolated={true}
            color={cell.color ?? '#d0baa0'} roughness={0.94} castShadow receiveShadow />
 
-         {/* Décorations murales fusionnées - bandes décoratives avec le même radius que le corps */}
+         {/* Décorations murales : bandes légèrement au-dessus du corps, sous les pierres */}
          <mesh name="decorativeBandTop" position={[0, 0.35, 0]} castShadow>
-           <cylinderGeometry args={[towerBodyRadius, towerBodyRadius, 0.05, towerDecoSegments]} />
-           <meshStandardMaterial color={varyColorBrightness(baseColor, -0.1)} roughness={0.9} />
+           <cylinderGeometry args={[towerDecoRadius, towerDecoRadius, 0.08, towerDecoSegments]} />
+           <meshStandardMaterial 
+             color={varyColorBrightness(baseColor, -0.2)} 
+             roughness={0.7} 
+             metalness={0.1}
+           />
          </mesh>
          <mesh name="decorativeBandBottom" position={[0, -0.35, 0]} castShadow>
-           <cylinderGeometry args={[towerBodyRadius, towerBodyRadius, 0.05, towerDecoSegments]} />
-           <meshStandardMaterial color={varyColorBrightness(baseColor, -0.1)} roughness={0.9} />
+           <cylinderGeometry args={[towerDecoRadius, towerDecoRadius, 0.08, towerDecoSegments]} />
+           <meshStandardMaterial 
+             color={varyColorBrightness(baseColor, -0.2)} 
+             roughness={0.7} 
+             metalness={0.1}
+           />
          </mesh>
 
         {/* Pierres apparentes - toujours présentes sur les murs */}
-        {renderStonePatches()}
+        {renderStonePatches(true, 'tower')}
 
         {exposedFaces.map((face, index) => renderFace(face, index, true))}
       </group>
@@ -392,17 +410,18 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     if (isFullyExposed) {
       // Pour les piliers complètement exposés, utiliser le même radius que le corps principal
       // Le ShapedBox avec isIsolated=false mais tous les coins arrondis devrait avoir un radius effectif proche de 0.5
-      const wallDecoRadius = 0.5; // Correspond au radius effectif du corps principal
-      const wallDecoSegments = 24; // Même nombre de segments que les tours
+      const wallBodyRadius = 0.5; // Correspond au radius effectif du corps principal
+      const wallDecoRadius = wallBodyRadius * 1.03; // 3% plus grand (0.515) pour être légèrement visible
+      const wallDecoSegments = 32; // Plus de segments pour un meilleur arrondi
 
       decoElements.push(
         <mesh key="deco-band-top" name="decorativeBandTop" position={[0, 0.35, 0]} castShadow>
-          <cylinderGeometry args={[wallDecoRadius, wallDecoRadius, 0.04, wallDecoSegments]} />
-          <meshStandardMaterial color={decoColor} roughness={0.9} />
+          <cylinderGeometry args={[wallDecoRadius, wallDecoRadius, 0.08, wallDecoSegments]} />
+          <meshStandardMaterial color={varyColorBrightness(baseColor, -0.2)} roughness={0.7} metalness={0.1} />
         </mesh>,
         <mesh key="deco-band-bottom" name="decorativeBandBottom" position={[0, -0.35, 0]} castShadow>
-          <cylinderGeometry args={[wallDecoRadius, wallDecoRadius, 0.04, wallDecoSegments]} />
-          <meshStandardMaterial color={decoColor} roughness={0.9} />
+          <cylinderGeometry args={[wallDecoRadius, wallDecoRadius, 0.08, wallDecoSegments]} />
+          <meshStandardMaterial color={varyColorBrightness(baseColor, -0.2)} roughness={0.7} metalness={0.1} />
         </mesh>
       );
     }
@@ -498,7 +517,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       {renderWallDecorations()}
 
       {/* Pierres apparentes - toujours présentes sur les murs (sauf toits) */}
-      {renderStonePatches()}
+      {renderStonePatches(isFullyExposed, 'wall')}
 
       {exposedFaces.map((face, index) => renderFace(face, index, false))}
     </group>

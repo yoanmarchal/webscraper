@@ -25,7 +25,20 @@ export class PropertyInheritanceSystem {
       color,
       decorationStyle: DecorationStyle.Standard,
       mergeFlags: {
-        mergeWithNeighbors: this.shouldMergeWithNeighbors(cell, buildingId)
+        mergeWithNeighbors: this.shouldMergeWithNeighbors(cell, buildingId),
+        suppressQuoin: {
+          backLeft: false,
+          backRight: false,
+          frontLeft: false,
+          frontRight: false
+        },
+        suppressBaseTrim: {
+          front: false,
+          back: false,
+          left: false,
+          right: false
+        },
+        suppressCornice: false
       }
     };
   }
