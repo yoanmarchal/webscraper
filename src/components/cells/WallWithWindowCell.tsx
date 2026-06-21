@@ -1,9 +1,17 @@
 import { RoundedBox } from '@react-three/drei';
 import type { GridCell, ProtectedAreasConfig } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { getExposedFaces, getCornerRadii, hasOccupiedCell } from '../../utils/cellUtils';
+import { 
+  getExposedFaces, 
+  getCornerRadii, 
+  hasOccupiedCell,
+  projectOnFace,
+  FLAT_LIMIT,
+  EDGE_R 
+} from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
+import { WINDOW_PROTECTED_AREAS } from '../../config/protectedAreasConfig';
 
 interface WallWithWindowCellProps {
   cell: GridCell;
@@ -64,23 +72,8 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     const stones: JSX.Element[] = [];
     const stoneColor = varyColorBrightness(baseColor, -0.25);
 
-    // Rayon des arcs de coin (EDGE_R dans ShapedBox)
-    const EDGE_R = 0.18;
-    const FLAT_LIMIT = 0.5 - EDGE_R; // 0.32
-
-    /**
-     * Définition des zones protégées pour fenêtres, portes et meurtrières
-     * Ces marges empêchent les pierres de se superposer aux éléments fonctionnels
-     * Les marges sont calculées comme la moitié de la taille de l'élément + une marge de sécurité
-     */
-    const PROTECTED_AREAS: ProtectedAreasConfig = {
-      // Fenêtre : cadre 0.6x0.5, vitre 0.54x0.44 → zone à protéger : ~0.35x0.27
-      window: { marginX: 0.32, marginY: 0.27, centerX: 0, centerY: 0 },
-      // Porte : cadre 0.48x0.8, panneau 0.4x0.7, centrée à y≈-0.10 → zone : ~0.24x0.40
-      door: { marginX: 0.26, marginY: 0.42, centerX: 0, centerY: -0.10 },
-      // Meurtrière : 0.14x0.4 → zone : ~0.08x0.22
-      arrowSlit: { marginX: 0.09, marginY: 0.23, centerX: 0, centerY: 0 },
-    };
+    // Utiliser la configuration centralisée des zones protégées
+    const PROTECTED_AREAS = WINDOW_PROTECTED_AREAS;
 
     /**
      * Vérifie si une position (x, y) sur une face est dans une zone protégée
@@ -116,27 +109,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       const closestX = Math.abs(x) - stoneWidth / 2;
       const closestY = Math.abs(y - area.centerY) - stoneHeight / 2;
       return closestX < area.marginX && closestY < area.marginY;
-    };
-
-    /**
-     * Projette un point latéral t sur la surface réelle d'une face.
-     * Retourne { surfaceZ, rotY } dans le repère local de la face.
-     */
-    const projectOnFace = (
-      t: number,
-      cornerRoundedNeg: boolean,
-      cornerRoundedPos: boolean,
-    ): { surfaceZ: number; rotY: number } => {
-      if (t > FLAT_LIMIT && cornerRoundedPos) {
-        const dx = Math.min(t - FLAT_LIMIT, EDGE_R);
-        const theta = Math.asin(dx / EDGE_R);
-        return { surfaceZ: FLAT_LIMIT + EDGE_R * Math.cos(theta), rotY: theta };
-      } else if (t < -FLAT_LIMIT && cornerRoundedNeg) {
-        const dx = Math.max(t + FLAT_LIMIT, -EDGE_R);
-        const theta = Math.asin(dx / EDGE_R);
-        return { surfaceZ: FLAT_LIMIT + EDGE_R * Math.cos(theta), rotY: theta };
-      }
-      return { surfaceZ: 0.5, rotY: 0 };
     };
 
     // Taille de base des pierres

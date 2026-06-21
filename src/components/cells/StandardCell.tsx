@@ -1,9 +1,16 @@
 import { RoundedBox } from '@react-three/drei';
-import type { GridCell, ProtectedArea, ProtectedAreasConfig } from '../../types';
+import type { GridCell, ProtectedAreasConfig } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { hasOccupiedCell, getExposedFaces, getCornerRadii } from '../../utils/cellUtils';
+import { 
+  hasOccupiedCell, 
+  getExposedFaces, 
+  getCornerRadii,
+  projectOnFace,
+  FLAT_LIMIT 
+} from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
+import { STANDARD_PROTECTED_AREAS, FACE_CORNERS } from '../../config/protectedAreasConfig';
 
 interface StandardCellProps {
   cell: GridCell;
@@ -100,24 +107,8 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
 
     const stones: JSX.Element[] = [];
 
-    // Rayon des arcs de coin tel que défini dans ShapedBox (EDGE_R = 0.18)
-    // Centre des arcs à ±(0.5 - EDGE_R) = ±0.32
-    const EDGE_R = 0.18;
-    const FLAT_LIMIT = 0.5 - EDGE_R; // 0.32 : limite de la zone plate
-
-    /**
-     * Définition des zones protégées pour éviter les superpositions
-     * avec les quoins (coins) et la base trim
-     * Les quoins sont positionnés aux coins : (±0.42, ±0.46) et (±0.46, ±0.42)
-     * avec des tailles de 0.16×0.18×0.08 et 0.08×0.18×0.16
-     */
-    const PROTECTED_AREAS: ProtectedAreasConfig = {
-      // Zones des coins sur chaque face
-      // Pour chaque coin, on protège une zone autour
-      corner: { marginX: 0.12, marginY: 0.12 },
-      // Zone de la base trim (en bas de chaque face)
-      baseTrim: { marginY: 0.10, centerY: -0.46 },
-    };
+    // Utiliser la configuration centralisée des zones protégées
+    const PROTECTED_AREAS = STANDARD_PROTECTED_AREAS;
 
     /**
      * Vérifie si une position (x, y) sur une face est dans une zone protégée
@@ -140,15 +131,8 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       const cornerMarginY = cornerArea.marginY;
       
       // Coordonnées des 4 coins de la face (normalisés à -0.5..0.5)
-      const CORNERS: [number, number][] = [
-        [-0.5, 0.5],   // Haut-gauche
-        [0.5, 0.5],    // Haut-droite
-        [-0.5, -0.5],  // Bas-gauche
-        [0.5, -0.5],   // Bas-droite
-      ];
-      
-      // Vérifier chaque coin
-      for (const [cornerX, cornerY] of CORNERS) {
+      // Vérifier chaque coin de la face
+      for (const [cornerX, cornerY] of FACE_CORNERS) {
         const distX = Math.abs(x - cornerX) - stoneWidth / 2;
         const distY = Math.abs(y - cornerY) - stoneHeight / 2;
         if (distX < cornerMarginX && distY < cornerMarginY) {
@@ -162,45 +146,6 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       if (closestY_Base < baseArea.marginY) return true;
       
       return false;
-    };
-
-    /**
-     * Projette un point (latéral t, profondeur nominale 0.5) sur la surface
-     * réelle d'une face, en tenant compte des coins arrondis.
-     * Retourne { surfaceZ: profondeur réelle, rotY: rotation tangente }
-     * dans le repère local de la face (Z+ = profondeur de sortie).
-     *
-     * cornerRoundedNeg : coin arrondi côté t < 0 ?
-     * cornerRoundedPos : coin arrondi côté t > 0 ?
-     */
-    const projectOnFace = (
-      t: number,
-      cornerRoundedNeg: boolean,
-      cornerRoundedPos: boolean,
-    ): { surfaceZ: number; rotY: number } => {
-      if (t > FLAT_LIMIT && cornerRoundedPos) {
-        // Zone de coin arrondi côté positif
-        const cx = FLAT_LIMIT; // centre de l'arc en X
-        const cz = FLAT_LIMIT; // centre de l'arc en Z
-        const dx = Math.min(t - cx, EDGE_R); // clamp au quart de cercle
-        const theta = Math.asin(dx / EDGE_R);
-        return {
-          surfaceZ: cz + EDGE_R * Math.cos(theta),
-          rotY: theta,
-        };
-      } else if (t < -FLAT_LIMIT && cornerRoundedNeg) {
-        // Zone de coin arrondi côté négatif
-        const cx = -FLAT_LIMIT;
-        const cz = FLAT_LIMIT;
-        const dx = Math.max(t - cx, -EDGE_R);
-        const theta = Math.asin(dx / EDGE_R); // négatif
-        return {
-          surfaceZ: cz + EDGE_R * Math.cos(theta),
-          rotY: theta,
-        };
-      }
-      // Zone plate
-      return { surfaceZ: 0.5, rotY: 0 };
     };
 
     // Taille de base des pierres

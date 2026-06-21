@@ -152,3 +152,53 @@ export function isTowerColumn(lookup: CellLookup, cell: GridCell): boolean {
   }
   return false;
 }
+
+// =============================================================================
+// Utilitaires de géométrie pour la projection sur les faces arrondies
+// =============================================================================
+
+/** Rayon des arcs de coin (utilisé dans ShapedBox) */
+export const EDGE_R = 0.18;
+
+/** Limite de la zone plate : 0.5 - EDGE_R = 0.32 */
+export const FLAT_LIMIT = 0.5 - EDGE_R;
+
+/**
+ * Projette un point latéral t sur la surface réelle d'une face,
+ * en tenant compte des coins arrondis.
+ * 
+ * @param t - Position latérale sur la face (-0.5 à 0.5)
+ * @param cornerRoundedNeg - True si le coin côté t < 0 est arrondi
+ * @param cornerRoundedPos - True si le coin côté t > 0 est arrondi
+ * @returns { surfaceZ, rotY } - Profondeur réelle sur la face et rotation tangente
+ * 
+ * Dans le repère local de la face :
+ * - t : position latérale (-0.5 à 0.5)
+ * - surfaceZ : profondeur de sortie (0 = centre, 0.5 = surface plate)
+ * - rotY : rotation tangente pour aligner avec la surface
+ */
+export function projectOnFace(
+  t: number,
+  cornerRoundedNeg: boolean,
+  cornerRoundedPos: boolean,
+): { surfaceZ: number; rotY: number } {
+  if (t > FLAT_LIMIT && cornerRoundedPos) {
+    // Zone de coin arrondi côté positif
+    const dx = Math.min(t - FLAT_LIMIT, EDGE_R);
+    const theta = Math.asin(dx / EDGE_R);
+    return {
+      surfaceZ: FLAT_LIMIT + EDGE_R * Math.cos(theta),
+      rotY: theta,
+    };
+  } else if (t < -FLAT_LIMIT && cornerRoundedNeg) {
+    // Zone de coin arrondi côté négatif
+    const dx = Math.max(t + FLAT_LIMIT, -EDGE_R);
+    const theta = Math.asin(dx / EDGE_R);
+    return {
+      surfaceZ: FLAT_LIMIT + EDGE_R * Math.cos(theta),
+      rotY: theta,
+    };
+  }
+  // Zone plate (pas de coin arrondi)
+  return { surfaceZ: 0.5, rotY: 0 };
+}
