@@ -11,7 +11,7 @@ import {
 } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
-import { WINDOW_PROTECTED_AREAS, isInProtectedArea } from '../../config/protectedAreasConfig';
+import { WINDOW_PROTECTED_AREAS, isInProtectedArea, TOWER_EXTERNAL_RADIUS, DECO_BAND_RADIUS } from '../../config/protectedAreasConfig';
 
 interface WallWithWindowCellProps {
   cell: GridCell;
@@ -35,7 +35,8 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   const avgRadius = (radii.backLeft + radii.backRight + radii.frontLeft + radii.frontRight) / 4;
 
   // Rayons pour les stone patches sur les tours (doit être déclaré avant renderStonePatches)
-  const towerStoneRadius = 0.5125; // Radius pour les pierres (légèrement au-dessus du cylindre 0.5 + 0.0125)
+  // Utilisation de la constante centralisée TOWER_EXTERNAL_RADIUS
+  const towerStoneRadius = TOWER_EXTERNAL_RADIUS;
 
   // Déterminer le contexte du bloc pour adapter les décorations murales
   const hasLeftNeighbor = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
@@ -165,8 +166,8 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           // Signe selon la face pour cohérence directionnelle
           const lateralSign = (face === 'back' || face === 'right') ? -1 : 1;
 
-          // Les pierres sont placées sur un cylindre légèrement plus grand (0.5125)
-          // pour être au-dessus des decorative bands (radius 0.505)
+          // Les pierres sont placées sur le cylindre externe (TOWER_EXTERNAL_RADIUS)
+          // pour être au-dessus des decorative bands (DECO_BAND_RADIUS)
           const safeT = Math.max(-towerStoneRadius * 0.95, Math.min(towerStoneRadius * 0.95, offsetX));
           const angle = baseFaceAngle + lateralSign * Math.asin(safeT / towerStoneRadius);
 
@@ -363,7 +364,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
      // Pour les tours, utiliser le même radius que le corps principal (0.5 pour un bloc 1x1x1)
      // Le ShapedBox avec isIsolated=true crée un cylindre de radius w/2 = 0.5
      const towerBodyRadius = 0.5; // Correspond au radius du cylindre principal
-     const towerDecoRadius = 0.505; // Légèrement au-dessus du cylindre pour visibilité
      const towerDecoSegments = 32; // Plus de segments pour un meilleur arrondi
 
      return (
@@ -373,7 +373,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
          {/* Décorations murales : bandes légèrement au-dessus du corps, sous les pierres */}
          <mesh name="decorativeBandTop" position={[0, 0.35, 0]} castShadow>
-           <cylinderGeometry args={[towerDecoRadius, towerDecoRadius, 0.08, towerDecoSegments]} />
+           <cylinderGeometry args={[DECO_BAND_RADIUS, DECO_BAND_RADIUS, 0.08, towerDecoSegments]} />
            <meshStandardMaterial 
              color={varyColorBrightness(baseColor, -0.2)} 
              roughness={0.7} 
@@ -381,7 +381,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
            />
          </mesh>
          <mesh name="decorativeBandBottom" position={[0, -0.35, 0]} castShadow>
-           <cylinderGeometry args={[towerDecoRadius, towerDecoRadius, 0.08, towerDecoSegments]} />
+           <cylinderGeometry args={[DECO_BAND_RADIUS, DECO_BAND_RADIUS, 0.08, towerDecoSegments]} />
            <meshStandardMaterial 
              color={varyColorBrightness(baseColor, -0.2)} 
              roughness={0.7} 
@@ -410,17 +410,15 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     if (isFullyExposed) {
       // Pour les piliers complètement exposés, utiliser le même radius que le corps principal
       // Le ShapedBox avec isIsolated=false mais tous les coins arrondis devrait avoir un radius effectif proche de 0.5
-      const wallBodyRadius = 0.5; // Correspond au radius effectif du corps principal
-      const wallDecoRadius = wallBodyRadius * 1.03; // 3% plus grand (0.515) pour être légèrement visible
       const wallDecoSegments = 32; // Plus de segments pour un meilleur arrondi
 
       decoElements.push(
         <mesh key="deco-band-top" name="decorativeBandTop" position={[0, 0.35, 0]} castShadow>
-          <cylinderGeometry args={[wallDecoRadius, wallDecoRadius, 0.08, wallDecoSegments]} />
+          <cylinderGeometry args={[DECO_BAND_RADIUS, DECO_BAND_RADIUS, 0.08, wallDecoSegments]} />
           <meshStandardMaterial color={varyColorBrightness(baseColor, -0.2)} roughness={0.7} metalness={0.1} />
         </mesh>,
         <mesh key="deco-band-bottom" name="decorativeBandBottom" position={[0, -0.35, 0]} castShadow>
-          <cylinderGeometry args={[wallDecoRadius, wallDecoRadius, 0.08, wallDecoSegments]} />
+          <cylinderGeometry args={[DECO_BAND_RADIUS, DECO_BAND_RADIUS, 0.08, wallDecoSegments]} />
           <meshStandardMaterial color={varyColorBrightness(baseColor, -0.2)} roughness={0.7} metalness={0.1} />
         </mesh>
       );

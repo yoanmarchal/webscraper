@@ -12,6 +12,13 @@ import type { ProtectedArea, ProtectedAreasConfig } from '../types';
 export const EDGE_R = 0.18;
 export const FLAT_LIMIT = 0.5 - EDGE_R; // 0.32
 
+// Rayon externe des éléments décoratifs sur les tours (cylindre principal = 0.5)
+// Tous les éléments décoratifs (decorative bands, stone patches) utilisent ce même rayon externe
+export const TOWER_EXTERNAL_RADIUS = 0.5125;
+
+// Rayon des decorative bands (légèrement inférieur au rayon externe pour qu'ils soient sous les pierres)
+export const DECO_BAND_RADIUS = 0.505;
+
 /**
  * Coordonnées des 4 coins d'une face (normalisées à -0.5..0.5)
  * Utilisées pour vérifier les superpositions avec les quoins
