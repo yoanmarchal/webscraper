@@ -65,6 +65,31 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     const stones: JSX.Element[] = [];
     const stoneColor = varyColorBrightness(baseColor, -0.25);
 
+    // Rayon des arcs de coin (EDGE_R dans ShapedBox)
+    const EDGE_R = 0.18;
+    const FLAT_LIMIT = 0.5 - EDGE_R; // 0.32
+
+    /**
+     * Projette un point latéral t sur la surface réelle d'une face.
+     * Retourne { surfaceZ, rotY } dans le repère local de la face.
+     */
+    const projectOnFace = (
+      t: number,
+      cornerRoundedNeg: boolean,
+      cornerRoundedPos: boolean,
+    ): { surfaceZ: number; rotY: number } => {
+      if (t > FLAT_LIMIT && cornerRoundedPos) {
+        const dx = Math.min(t - FLAT_LIMIT, EDGE_R);
+        const theta = Math.asin(dx / EDGE_R);
+        return { surfaceZ: FLAT_LIMIT + EDGE_R * Math.cos(theta), rotY: theta };
+      } else if (t < -FLAT_LIMIT && cornerRoundedNeg) {
+        const dx = Math.max(t + FLAT_LIMIT, -EDGE_R);
+        const theta = Math.asin(dx / EDGE_R);
+        return { surfaceZ: FLAT_LIMIT + EDGE_R * Math.cos(theta), rotY: theta };
+      }
+      return { surfaceZ: 0.5, rotY: 0 };
+    };
+
     // Taille de base des pierres
     const baseStoneW = 0.12 + (Math.abs(cell.x) % 4) * 0.02;
     const baseStoneH = baseStoneW * 0.75;
@@ -90,7 +115,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         const h = baseStoneH * (0.8 + (h2 % 15) / 100);
 
         // Répartir dans les 4 quadrants pour éviter le centre
-        // (zone réservée aux portes/fenêtres)
         const quadrant = i % 4;
         const signX = (quadrant === 0 || quadrant === 2) ? -1 : 1;
         const signY = (quadrant === 0 || quadrant === 1) ? -1 : 1;
@@ -115,7 +139,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           const towerRadius = 0.502;
           const posX = Math.sin(angle) * towerRadius;
           const posZ = Math.cos(angle) * towerRadius;
-          const rotY = angle; // tangent outward: box Z-axis = (sin(angle), 0, cos(angle))
+          const rotY = angle;
 
           stones.push(
             <mesh
@@ -131,16 +155,35 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
             </mesh>
           );
         } else {
-          // ── Mur plat : pierres plaquées sur la surface ────────────────────
+          // ── Mur avec coins éventuellement arrondis ────────────────────────
           let pos: [number, number, number] = [0, 0, 0];
           let rot: [number, number, number] = [0, 0, 0];
-          const d = 0.502;
 
           switch (face) {
-            case 'front': pos = [offsetX, offsetY,  d]; rot = [0, 0, 0];            break;
-            case 'back':  pos = [offsetX, offsetY, -d]; rot = [0, Math.PI, 0];      break;
-            case 'left':  pos = [-d, offsetY, offsetX]; rot = [0,  Math.PI / 2, 0]; break;
-            case 'right': pos = [ d, offsetY, offsetX]; rot = [0, -Math.PI / 2, 0]; break;
+            case 'front': {
+              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.frontLeft > 0.01, radii.frontRight > 0.01);
+              pos = [offsetX, offsetY, surfaceZ + 0.003];
+              rot = [0, rotY, 0];
+              break;
+            }
+            case 'back': {
+              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft > 0.01, radii.backRight > 0.01);
+              pos = [offsetX, offsetY, -(surfaceZ + 0.003)];
+              rot = [0, Math.PI - rotY, 0];
+              break;
+            }
+            case 'left': {
+              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft > 0.01, radii.frontLeft > 0.01);
+              pos = [-(surfaceZ + 0.003), offsetY, offsetX];
+              rot = [0, Math.PI / 2 + rotY, 0];
+              break;
+            }
+            case 'right': {
+              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backRight > 0.01, radii.frontRight > 0.01);
+              pos = [surfaceZ + 0.003, offsetY, offsetX];
+              rot = [0, -(Math.PI / 2 + rotY), 0];
+              break;
+            }
           }
 
           stones.push(
@@ -163,6 +206,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
     return <>{stones}</>;
   };
+
 
   // ── Fenêtre simplifiée ─────────────────────────────────────────────────
   const createSimpleWindow = (rotation: number, faceId: number) => {

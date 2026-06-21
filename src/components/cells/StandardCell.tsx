@@ -107,8 +107,49 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
 
     const stones: JSX.Element[] = [];
 
-    // Indique si le mur est arrondi (tour cylindrique isolée) ou plat
-    const isRound = isIsolated;
+    // Rayon des arcs de coin tel que défini dans ShapedBox (EDGE_R = 0.18)
+    // Centre des arcs à ±(0.5 - EDGE_R) = ±0.32
+    const EDGE_R = 0.18;
+    const FLAT_LIMIT = 0.5 - EDGE_R; // 0.32 : limite de la zone plate
+
+    /**
+     * Projette un point (latéral t, profondeur nominale 0.5) sur la surface
+     * réelle d'une face, en tenant compte des coins arrondis.
+     * Retourne { surfaceZ: profondeur réelle, rotY: rotation tangente }
+     * dans le repère local de la face (Z+ = profondeur de sortie).
+     *
+     * cornerRoundedNeg : coin arrondi côté t < 0 ?
+     * cornerRoundedPos : coin arrondi côté t > 0 ?
+     */
+    const projectOnFace = (
+      t: number,
+      cornerRoundedNeg: boolean,
+      cornerRoundedPos: boolean,
+    ): { surfaceZ: number; rotY: number } => {
+      if (t > FLAT_LIMIT && cornerRoundedPos) {
+        // Zone de coin arrondi côté positif
+        const cx = FLAT_LIMIT; // centre de l'arc en X
+        const cz = FLAT_LIMIT; // centre de l'arc en Z
+        const dx = Math.min(t - cx, EDGE_R); // clamp au quart de cercle
+        const theta = Math.asin(dx / EDGE_R);
+        return {
+          surfaceZ: cz + EDGE_R * Math.cos(theta),
+          rotY: theta,
+        };
+      } else if (t < -FLAT_LIMIT && cornerRoundedNeg) {
+        // Zone de coin arrondi côté négatif
+        const cx = -FLAT_LIMIT;
+        const cz = FLAT_LIMIT;
+        const dx = Math.max(t - cx, -EDGE_R);
+        const theta = Math.asin(dx / EDGE_R); // négatif
+        return {
+          surfaceZ: cz + EDGE_R * Math.cos(theta),
+          rotY: theta,
+        };
+      }
+      // Zone plate
+      return { surfaceZ: 0.5, rotY: 0 };
+    };
 
     // Taille de base des pierres
     const baseW = 0.14;
@@ -129,37 +170,29 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
         const w = baseW + (h2 % 5) * 0.018; // 0.14 → 0.21
         const h = baseH + (h3 % 4) * 0.012; // 0.09 → 0.14
 
-        // Position évitant le centre (réservé aux portes/fenêtres)
-        // On répartit les pierres dans les 4 quadrants de la face
+        // Position dans les quadrants, évitant le centre
         const quadrant = i % 4;
-        // Signe X et Y selon le quadrant
         const signX = (quadrant === 0 || quadrant === 2) ? -1 : 1;
         const signY = (quadrant === 0 || quadrant === 1) ? -1 : 1;
-        // Distance depuis le centre : 0.20 à 0.40
-        const distX = 0.20 + (h1 % 20) * 0.01;
+        const distX = 0.20 + (h1 % 20) * 0.01; // 0.20 → 0.39
         const distY = 0.18 + (h2 % 18) * 0.01;
         const offsetX = signX * distX;
         const offsetY = signY * distY;
 
-        if (isRound) {
+        if (isIsolated) {
           // ── Tour cylindrique : pierres tangentes à la surface ──────────────
-          // Angle aléatoire autour du cylindre, mais centré sur la face
           const faceAngles: Record<string, number> = {
-            front: 0,
-            back: Math.PI,
-            right: Math.PI / 2,
-            left: -Math.PI / 2,
+            front: 0, back: Math.PI, right: Math.PI / 2, left: -Math.PI / 2,
           };
           const baseFaceAngle = faceAngles[face] ?? 0;
-          // Répartir les pierres en éventail autour de l'angle de la face
-          const spread = (Math.PI / 2) * 0.7; // ±35° autour de la face
+          const spread = (Math.PI / 2) * 0.7;
           const angleOffset = (h1 / 100 - 0.5) * spread;
           const angle = baseFaceAngle + angleOffset;
 
           const radius = 0.502;
           const posX = Math.sin(angle) * radius;
           const posZ = Math.cos(angle) * radius;
-          const rotY = angle; // tangent outward: box Z-axis = (sin(angle), 0, cos(angle))
+          const rotY = angle;
 
           stones.push(
             <mesh
@@ -176,16 +209,52 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
             </mesh>
           );
         } else {
-          // ── Mur plat : pierres plaquées sur la surface ────────────────────
+          // ── Mur avec coins éventuellement arrondis ────────────────────────
+          // Détecter si chaque coin de la face est arrondi
           let pos: [number, number, number] = [0, 0, 0];
           let rot: [number, number, number] = [0, 0, 0];
-          const d = 0.503; // Légèrement en saillie
 
           switch (face) {
-            case 'front': pos = [offsetX, offsetY,  d]; rot = [0, 0, 0];           break;
-            case 'back':  pos = [offsetX, offsetY, -d]; rot = [0, Math.PI, 0];     break;
-            case 'left':  pos = [-d, offsetY, offsetX]; rot = [0,  Math.PI / 2, 0]; break;
-            case 'right': pos = [ d, offsetY, offsetX]; rot = [0, -Math.PI / 2, 0]; break;
+            case 'front': {
+              // Face Z+ : latéral = X, profondeur = Z
+              // Coins : frontLeft (X-), frontRight (X+)
+              const crNeg = radii.frontLeft > 0.01;
+              const crPos = radii.frontRight > 0.01;
+              const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
+              pos = [offsetX, offsetY, surfaceZ + 0.003];
+              rot = [0, rotY, 0];
+              break;
+            }
+            case 'back': {
+              // Face Z- : latéral = X (inversé), profondeur = -Z
+              // Coins : backLeft (X-), backRight (X+)
+              const crNeg = radii.backLeft > 0.01;
+              const crPos = radii.backRight > 0.01;
+              const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
+              pos = [offsetX, offsetY, -(surfaceZ + 0.003)];
+              rot = [0, Math.PI - rotY, 0];
+              break;
+            }
+            case 'left': {
+              // Face X- : latéral = Z, profondeur = -X
+              // Coins : backLeft (Z-), frontLeft (Z+)
+              const crNeg = radii.backLeft > 0.01;
+              const crPos = radii.frontLeft > 0.01;
+              const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
+              pos = [-(surfaceZ + 0.003), offsetY, offsetX];
+              rot = [0, Math.PI / 2 + rotY, 0];
+              break;
+            }
+            case 'right': {
+              // Face X+ : latéral = Z, profondeur = X
+              // Coins : backRight (Z-), frontRight (Z+)
+              const crNeg = radii.backRight > 0.01;
+              const crPos = radii.frontRight > 0.01;
+              const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
+              pos = [surfaceZ + 0.003, offsetY, offsetX];
+              rot = [0, -(Math.PI / 2 + rotY), 0];
+              break;
+            }
           }
 
           stones.push(
