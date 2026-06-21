@@ -70,6 +70,56 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     const FLAT_LIMIT = 0.5 - EDGE_R; // 0.32
 
     /**
+     * Définition des zones protégées pour fenêtres, portes et meurtrières
+     * Ces marges empêchent les pierres de se superposer aux éléments fonctionnels
+     * Les marges sont calculées comme la moitié de la taille de l'élément + une marge de sécurité
+     */
+    const PROTECTED_AREAS = {
+      // Fenêtre : cadre 0.6x0.5, vitre 0.54x0.44 → zone à protéger : ~0.35x0.27
+      window: { marginX: 0.32, marginY: 0.27, centerX: 0, centerY: 0 },
+      // Porte : cadre 0.48x0.8, panneau 0.4x0.7, centrée à y≈-0.10 → zone : ~0.24x0.40
+      door: { marginX: 0.26, marginY: 0.42, centerX: 0, centerY: -0.10 },
+      // Meurtrière : 0.14x0.4 → zone : ~0.08x0.22
+      arrowSlit: { marginX: 0.09, marginY: 0.23, centerX: 0, centerY: 0 },
+    };
+
+    /**
+     * Vérifie si une position (x, y) sur une face est dans une zone protégée
+     * @param face - La face concernée
+     * @param x - Position horizontale sur la face (-0.5 à 0.5)
+     * @param y - Position verticale sur la face (-0.5 à 0.5)
+     * @param stoneWidth - Largeur de la pierre
+     * @param stoneHeight - Hauteur de la pierre
+     * @returns true si la pierre chevauche une zone protégée
+     */
+    const isInProtectedZone = (
+      face: string,
+      x: number,
+      y: number,
+      stoneWidth: number,
+      stoneHeight: number
+    ): boolean => {
+      let area;
+      
+      // Déterminer quel élément est sur cette face
+      if (face === doorFace) {
+        // Face avec porte
+        area = PROTECTED_AREAS.door;
+      } else if (isIsolated) {
+        // Pour les tours isolées, toutes les faces exposées ont des meurtrières
+        area = PROTECTED_AREAS.arrowSlit;
+      } else {
+        // Pour les murs standards, les faces exposées (non-porte) ont des fenêtres
+        area = PROTECTED_AREAS.window;
+      }
+
+      // Vérifier si le coin de la pierre le plus proche du centre est dans la zone protégée
+      const closestX = Math.abs(x) - stoneWidth / 2;
+      const closestY = Math.abs(y - area.centerY) - stoneHeight / 2;
+      return closestX < area.marginX && closestY < area.marginY;
+    };
+
+    /**
      * Projette un point latéral t sur la surface réelle d'une face.
      * Retourne { surfaceZ, rotY } dans le repère local de la face.
      */
@@ -126,6 +176,11 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         const distY = (isDoorFace ? 0.25 : 0.18) + (h2 % 16) * 0.01;
         const offsetX = signX * distX;
         const offsetY = signY * distY;
+
+        // Vérifier si cette pierre est dans une zone protégée
+        if (isInProtectedZone(face, offsetX, offsetY, w, h)) {
+          continue; // Sauter cette pierre
+        }
 
         if (isIsolated) {
           // ── Tour cylindrique : projection de offsetX sur la surface du cylindre ─

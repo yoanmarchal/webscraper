@@ -113,6 +113,72 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
     const FLAT_LIMIT = 0.5 - EDGE_R; // 0.32 : limite de la zone plate
 
     /**
+     * Définition des zones protégées pour éviter les superpositions
+     * avec les quoins (coins) et la base trim
+     * Les quoins sont positionnés aux coins : (±0.42, ±0.46) et (±0.46, ±0.42)
+     * avec des tailles de 0.16×0.18×0.08 et 0.08×0.18×0.16
+     */
+    const PROTECTED_AREAS = {
+      // Zones des coins sur chaque face
+      // Pour chaque coin, on protège une zone autour
+      corner: { marginX: 0.12, marginY: 0.12 },
+      // Zone de la base trim (en bas de chaque face)
+      baseTrim: { marginY: 0.10, centerY: -0.46 },
+    };
+
+    /**
+     * Vérifie si une position (x, y) sur une face est dans une zone protégée
+     * @param face - La face concernée
+     * @param x - Position horizontale sur la face (-0.5 à 0.5)
+     * @param y - Position verticale sur la face (-0.5 à 0.5)
+     * @param stoneWidth - Largeur de la pierre
+     * @param stoneHeight - Hauteur de la pierre
+     * @returns true si la pierre chevauche une zone protégée
+     */
+    const isInProtectedZone = (
+      face: string,
+      x: number,
+      y: number,
+      stoneWidth: number,
+      stoneHeight: number
+    ): boolean => {
+      // Vérifier les coins de la face
+      // Sur chaque face (qui va de -0.5 à 0.5 en x et y),
+      // les coins sont aux extrémités : (-0.5, -0.5), (-0.5, 0.5), (0.5, -0.5), (0.5, 0.5)
+      
+      const cornerMarginX = PROTECTED_AREAS.corner.marginX;
+      const cornerMarginY = PROTECTED_AREAS.corner.marginY;
+      
+      // Calculer la distance du bord de la pierre au coin
+      // Coin haut-gauche (-0.5, 0.5)
+      const distToTL_X = Math.abs(x - (-0.5)) - stoneWidth / 2;
+      const distToTL_Y = Math.abs(y - 0.5) - stoneHeight / 2;
+      if (distToTL_X < cornerMarginX && distToTL_Y < cornerMarginY) return true;
+      
+      // Coin haut-droite (0.5, 0.5)
+      const distToTR_X = Math.abs(x - 0.5) - stoneWidth / 2;
+      const distToTR_Y = Math.abs(y - 0.5) - stoneHeight / 2;
+      if (distToTR_X < cornerMarginX && distToTR_Y < cornerMarginY) return true;
+      
+      // Coin bas-gauche (-0.5, -0.5)
+      const distToBL_X = Math.abs(x - (-0.5)) - stoneWidth / 2;
+      const distToBL_Y = Math.abs(y - (-0.5)) - stoneHeight / 2;
+      if (distToBL_X < cornerMarginX && distToBL_Y < cornerMarginY) return true;
+      
+      // Coin bas-droite (0.5, -0.5)
+      const distToBR_X = Math.abs(x - 0.5) - stoneWidth / 2;
+      const distToBR_Y = Math.abs(y - (-0.5)) - stoneHeight / 2;
+      if (distToBR_X < cornerMarginX && distToBR_Y < cornerMarginY) return true;
+      
+      // Vérifier la zone de la base trim (en bas)
+      const baseArea = PROTECTED_AREAS.baseTrim;
+      const closestY_Base = Math.abs(y - baseArea.centerY) - stoneHeight / 2;
+      if (closestY_Base < baseArea.marginY) return true;
+      
+      return false;
+    };
+
+    /**
      * Projette un point (latéral t, profondeur nominale 0.5) sur la surface
      * réelle d'une face, en tenant compte des coins arrondis.
      * Retourne { surfaceZ: profondeur réelle, rotY: rotation tangente }
@@ -178,6 +244,12 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
         const distY = 0.18 + (h2 % 18) * 0.01;
         const offsetX = signX * distX;
         const offsetY = signY * distY;
+
+        // Vérifier si cette pierre est dans une zone protégée (coin ou base trim)
+        if (isInProtectedZone(face, offsetX, offsetY, w, h)) {
+          continue; // Sauter cette pierre
+        }
+
 
         if (isIsolated) {
           // ── Tour cylindrique : projection de offsetX sur la surface du cylindre ─
