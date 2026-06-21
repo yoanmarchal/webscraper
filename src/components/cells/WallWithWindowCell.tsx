@@ -94,8 +94,9 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     const baseStoneW = 0.12 + (Math.abs(cell.x) % 4) * 0.02;
     const baseStoneH = baseStoneW * 0.75;
 
-    // Adapter le radius au style de bloc (cylindrique ou plat)
-    const stoneRadius = isIsolated ? 0.005 : Math.min(0.02, avgRadius * 0.5);
+    // Rayon d'arrondi des pierres : proportionnel à la hauteur de la pierre
+    // Même valeur pour tours et murs plats
+    const stoneRadius = 0.012;
 
     // Nombre de pierres par face (3-5)
     const stonesPerFace = 3 + (Math.abs(cell.x * 3 + cell.z * 7) % 3);
@@ -127,16 +128,21 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         const offsetY = signY * distY;
 
         if (isIsolated) {
-          // ── Tour cylindrique : pierres tangentes à la surface ──────────────
+          // ── Tour cylindrique : projection de offsetX sur la surface du cylindre ─
+          // Même logique que les murs plats : offsetX est la position latérale
+          // sur la face, projetée sur le cercle via asin(t/r).
           const faceAngles: Record<string, number> = {
             front: 0, back: Math.PI, right: Math.PI / 2, left: -Math.PI / 2,
           };
           const baseFaceAngle = faceAngles[face] ?? 0;
-          const spread = (Math.PI / 2) * 0.75;
-          const angleOffset = (h3 / 100 - 0.5) * spread;
-          const angle = baseFaceAngle + angleOffset;
+
+          // Signe selon la face pour cohérence directionnelle
+          const lateralSign = (face === 'back' || face === 'right') ? -1 : 1;
 
           const towerRadius = 0.502;
+          const safeT = Math.max(-towerRadius * 0.95, Math.min(towerRadius * 0.95, offsetX));
+          const angle = baseFaceAngle + lateralSign * Math.asin(safeT / towerRadius);
+
           const posX = Math.sin(angle) * towerRadius;
           const posZ = Math.cos(angle) * towerRadius;
           const rotY = angle;
@@ -150,8 +156,9 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
               castShadow
               receiveShadow
             >
-              <boxGeometry args={[w * 0.9, h, 0.014]} />
-              <meshStandardMaterial color={stoneColor} roughness={0.85} metalness={0.05} />
+              <RoundedBox args={[w, h, 0.025]} radius={stoneRadius} smoothness={4}>
+                <meshStandardMaterial color={stoneColor} roughness={0.85} metalness={0.05} />
+              </RoundedBox>
             </mesh>
           );
         } else {

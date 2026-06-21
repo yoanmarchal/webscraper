@@ -180,16 +180,25 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
         const offsetY = signY * distY;
 
         if (isIsolated) {
-          // ── Tour cylindrique : pierres tangentes à la surface ──────────────
+          // ── Tour cylindrique : projection de offsetX sur la surface du cylindre ─
+          // Même logique que les murs plats : offsetX est la position latérale
+          // sur la face, projetée sur le cercle via asin(t/r).
           const faceAngles: Record<string, number> = {
             front: 0, back: Math.PI, right: Math.PI / 2, left: -Math.PI / 2,
           };
           const baseFaceAngle = faceAngles[face] ?? 0;
-          const spread = (Math.PI / 2) * 0.7;
-          const angleOffset = (h1 / 100 - 0.5) * spread;
-          const angle = baseFaceAngle + angleOffset;
+
+          // Le signe de la projection dépend de la face pour garder la
+          // cohérence avec la direction latérale sur chaque face :
+          //   front : X+ → angle+   back  : X+ → angle-
+          //   left  : Z+ → angle+   right : Z+ → angle-
+          const lateralSign = (face === 'back' || face === 'right') ? -1 : 1;
 
           const radius = 0.502;
+          // Clamp pour éviter asin hors domaine
+          const safeT = Math.max(-radius * 0.95, Math.min(radius * 0.95, offsetX));
+          const angle = baseFaceAngle + lateralSign * Math.asin(safeT / radius);
+
           const posX = Math.sin(angle) * radius;
           const posZ = Math.cos(angle) * radius;
           const rotY = angle;
