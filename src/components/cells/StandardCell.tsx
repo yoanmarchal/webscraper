@@ -101,62 +101,112 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
     const exposedFaces = getExposedFaces(lookup, cell);
     if (exposedFaces.length === 0) return null;
 
-    // Debug: vérifier le style décoratif
-    console.log(`Cell (${cell.x},${cell.y},${cell.z}) - DecorationStyle:`, cell.propertyBundle?.decorationStyle);
-
-    // Vérifier si le style décoratif permet les pierres apparentes
-    // Seule le style STONE devrait avoir des pierres apparentes
+    // Seul le style STONE affiche les pierres apparentes
     const hasStoneStyle = cell.propertyBundle?.decorationStyle === 'STONE';
-    if (!hasStoneStyle) {
-      console.log(`Cell (${cell.x},${cell.y},${cell.z}) - Pas de style STONE, pas de pierres apparentes`);
-      return null;
-    }
+    if (!hasStoneStyle) return null;
 
-    // Calcul déterministe pour éviter les changements lors des re-rendus
-    const hash1 = Math.abs(cell.x * 17 + cell.y * 31 + cell.z * 47) % 100;
-    const hash2 = Math.abs(cell.x * 79 + cell.y * 13 + cell.z * 97) % 100;
+    const stones: JSX.Element[] = [];
 
-    // 40% de chance d'avoir une plaque de maçonnerie apparente
-    if (hash1 > 40) return null;
+    // Indique si le mur est arrondi (tour cylindrique isolée) ou plat
+    const isRound = isIsolated;
 
-    const face = exposedFaces[hash2 % exposedFaces.length];
-    
-    // Décalage aléatoire sur le mur
-    const offsetX = ((hash1 % 10) / 10 - 0.5) * 0.4;
-    const offsetY = (((hash1 / 10) % 10) / 10 - 0.5) * 0.4;
+    // Taille de base des pierres
+    const baseW = 0.14;
+    const baseH = 0.09;
 
-    const w = 0.18 + (hash2 % 4) * 0.03; // 0.18 à 0.30
-    const h = 0.12 + ((hash2 / 4) % 3) * 0.02; // 0.12 à 0.18
+    // Nombre de pierres par face (3-5 selon seed)
+    const stonesPerFace = 3 + (Math.abs(cell.x * 3 + cell.z * 7) % 3);
 
-    let position: [number, number, number] = [0, 0, 0];
-    let rotation: [number, number, number] = [0, 0, 0];
+    exposedFaces.forEach((face, faceIdx) => {
+      for (let i = 0; i < stonesPerFace; i++) {
+        // Hash déterministe par face + pierre
+        const seed = Math.abs(cell.x * 17 + cell.y * 31 + cell.z * 47 + faceIdx * 23 + i * 59);
+        const h1 = seed % 100;
+        const h2 = (seed * 7 + 13) % 100;
+        const h3 = (seed * 3 + 41) % 100;
 
-    switch (face) {
-      case 'front':
-        position = [offsetX, offsetY, 0.503];
-        rotation = [0, 0, 0];
-        break;
-      case 'back':
-        position = [offsetX, offsetY, -0.503];
-        rotation = [0, Math.PI, 0];
-        break;
-      case 'left':
-        position = [-0.503, offsetY, offsetX];
-        rotation = [0, Math.PI / 2, 0];
-        break;
-      case 'right':
-        position = [0.503, offsetY, offsetX];
-        rotation = [0, -Math.PI / 2, 0];
-        break;
-    }
+        // Variation de taille
+        const w = baseW + (h2 % 5) * 0.018; // 0.14 → 0.21
+        const h = baseH + (h3 % 4) * 0.012; // 0.09 → 0.14
 
-    return (
-      <mesh name="stonePatch" position={position} rotation={rotation} castShadow receiveShadow>
-        <RoundedBox args={[w, h, 0.01]} radius={0.005} smoothness={2}>
-          <meshStandardMaterial color={patchColor} roughness={0.95} />
-        </RoundedBox>
-      </mesh>
-    );
+        // Position évitant le centre (réservé aux portes/fenêtres)
+        // On répartit les pierres dans les 4 quadrants de la face
+        const quadrant = i % 4;
+        // Signe X et Y selon le quadrant
+        const signX = (quadrant === 0 || quadrant === 2) ? -1 : 1;
+        const signY = (quadrant === 0 || quadrant === 1) ? -1 : 1;
+        // Distance depuis le centre : 0.20 à 0.40
+        const distX = 0.20 + (h1 % 20) * 0.01;
+        const distY = 0.18 + (h2 % 18) * 0.01;
+        const offsetX = signX * distX;
+        const offsetY = signY * distY;
+
+        if (isRound) {
+          // ── Tour cylindrique : pierres tangentes à la surface ──────────────
+          // Angle aléatoire autour du cylindre, mais centré sur la face
+          const faceAngles: Record<string, number> = {
+            front: 0,
+            back: Math.PI,
+            right: Math.PI / 2,
+            left: -Math.PI / 2,
+          };
+          const baseFaceAngle = faceAngles[face] ?? 0;
+          // Répartir les pierres en éventail autour de l'angle de la face
+          const spread = (Math.PI / 2) * 0.7; // ±35° autour de la face
+          const angleOffset = (h1 / 100 - 0.5) * spread;
+          const angle = baseFaceAngle + angleOffset;
+
+          const radius = 0.502;
+          const posX = Math.sin(angle) * radius;
+          const posZ = Math.cos(angle) * radius;
+          const rotY = angle; // tangent outward: box Z-axis = (sin(angle), 0, cos(angle))
+
+          stones.push(
+            <mesh
+              key={`stone-${face}-${i}`}
+              name={`stonePatch-${face}-${i}`}
+              position={[posX, offsetY, posZ]}
+              rotation={[0, rotY, 0]}
+              castShadow
+              receiveShadow
+            >
+              <RoundedBox args={[w, h, 0.012]} radius={0.004} smoothness={2}>
+                <meshStandardMaterial color={patchColor} roughness={0.95} />
+              </RoundedBox>
+            </mesh>
+          );
+        } else {
+          // ── Mur plat : pierres plaquées sur la surface ────────────────────
+          let pos: [number, number, number] = [0, 0, 0];
+          let rot: [number, number, number] = [0, 0, 0];
+          const d = 0.503; // Légèrement en saillie
+
+          switch (face) {
+            case 'front': pos = [offsetX, offsetY,  d]; rot = [0, 0, 0];           break;
+            case 'back':  pos = [offsetX, offsetY, -d]; rot = [0, Math.PI, 0];     break;
+            case 'left':  pos = [-d, offsetY, offsetX]; rot = [0,  Math.PI / 2, 0]; break;
+            case 'right': pos = [ d, offsetY, offsetX]; rot = [0, -Math.PI / 2, 0]; break;
+          }
+
+          stones.push(
+            <mesh
+              key={`stone-${face}-${i}`}
+              name={`stonePatch-${face}-${i}`}
+              position={pos}
+              rotation={rot}
+              castShadow
+              receiveShadow
+            >
+              <RoundedBox args={[w, h, 0.012]} radius={0.004} smoothness={2}>
+                <meshStandardMaterial color={patchColor} roughness={0.95} />
+              </RoundedBox>
+            </mesh>
+          );
+        }
+      }
+    });
+
+    return <>{stones}</>;
   };
 
   const renderBaseTrim = () => {
