@@ -35,7 +35,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   const avgRadius = (radii.backLeft + radii.backRight + radii.frontLeft + radii.frontRight) / 4;
 
   // Rayons pour les stone patches sur les tours (doit être déclaré avant renderStonePatches)
-  const towerStoneRadius = 0.53; // Radius pour les pierres (au-dessus du decorative band à 0.515)
+  const towerStoneRadius = 0.5125; // Radius pour les pierres (légèrement au-dessus du cylindre 0.5 + 0.0125)
 
   // Déterminer le contexte du bloc pour adapter les décorations murales
   const hasLeftNeighbor = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
@@ -165,7 +165,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           // Signe selon la face pour cohérence directionnelle
           const lateralSign = (face === 'back' || face === 'right') ? -1 : 1;
 
-          // Les pierres sont placées sur un cylindre légèrement plus grand (0.51)
+          // Les pierres sont placées sur un cylindre légèrement plus grand (0.5125)
           // pour être au-dessus des decorative bands (radius 0.505)
           const safeT = Math.max(-towerStoneRadius * 0.95, Math.min(towerStoneRadius * 0.95, offsetX));
           const angle = baseFaceAngle + lateralSign * Math.asin(safeT / towerStoneRadius);
@@ -363,7 +363,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
      // Pour les tours, utiliser le même radius que le corps principal (0.5 pour un bloc 1x1x1)
      // Le ShapedBox avec isIsolated=true crée un cylindre de radius w/2 = 0.5
      const towerBodyRadius = 0.5; // Correspond au radius du cylindre principal
-     const towerDecoRadius = towerBodyRadius * 1.03; // 3% plus grand (0.515) pour être légèrement visible
+     const towerDecoRadius = 0.505; // Légèrement au-dessus du cylindre pour visibilité
      const towerDecoSegments = 32; // Plus de segments pour un meilleur arrondi
 
      return (
@@ -411,7 +411,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       // Pour les piliers complètement exposés, utiliser le même radius que le corps principal
       // Le ShapedBox avec isIsolated=false mais tous les coins arrondis devrait avoir un radius effectif proche de 0.5
       const wallBodyRadius = 0.5; // Correspond au radius effectif du corps principal
-      const wallDecoRadius = wallBodyRadius * 1.03; // 3% plus grand (0.515) pour être légèrement visible
+      const wallDecoRadius = 0.505; // Légèrement au-dessus du cylindre pour visibilité
       const wallDecoSegments = 32; // Plus de segments pour un meilleur arrondi
 
       decoElements.push(

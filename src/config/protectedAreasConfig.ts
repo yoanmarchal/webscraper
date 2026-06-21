@@ -96,15 +96,15 @@ export const WINDOW_PROTECTED_AREAS: ProtectedAreasConfig = {
   // Marge : 0.09 × 0.23
   arrowSlit: { marginX: 0.09, marginY: 0.23, centerX: 0, centerY: 0 },
   
-  // Decorative Band Top : bande circulaire à y=0.35, radius=0.505, height=0.06
+  // Decorative Band Top : bande circulaire à y=0.35, radius=0.505, height=0.08
   // Zone à protéger : marge pour éviter les superpositions avec les pierres
-  // Note : Les pierres sont décalées de 0.015, donc elles sont à 0.515 (au-dessus de 0.505)
-  // Cette zone protège le band lui-même
-  bandTop: { marginX: 0.40, marginY: 0.03, centerX: 0, centerY: 0.35 },
+  // Les pierres sont à 0.5125 (au-dessus de 0.505)
+  // Marge radiale de 0.40 pour couvrir la largeur du band
+  bandTop: { marginX: 0.40, marginY: 0.04, centerX: 0, centerY: 0.35 },
   
-  // Decorative Band Bottom : bande circulaire à y=-0.35, radius=0.505, height=0.06
+  // Decorative Band Bottom : bande circulaire à y=-0.35, radius=0.505, height=0.08
   // Zone à protéger : marge pour éviter les superpositions avec les pierres
-  bandBottom: { marginX: 0.40, marginY: 0.03, centerX: 0, centerY: -0.35 },
+  bandBottom: { marginX: 0.40, marginY: 0.04, centerX: 0, centerY: -0.35 },
 };
 
 /**
