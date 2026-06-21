@@ -496,13 +496,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           decoRotation = [0, Math.PI, 0];
           break;
       }
-
-      decoElements.push(
-        <mesh key="side-deco" name="sideDecoration" position={decoPosition} rotation={decoRotation} castShadow>
-          <boxGeometry args={[1.02, 0.1, 0.03]} />
-          <meshStandardMaterial color={decoColor} roughness={0.88} />
-        </mesh>
-      );
     }
 
     return <>{decoElements}</>;
