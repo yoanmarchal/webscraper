@@ -434,40 +434,43 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       const hasBottomRightCorner = !hasRightNeighbor && !hasFrontNeighbor;
 
       if (hasTopLeftCorner) {
-        // Coin haut-gauche-arrière : (-0.5, 0.5, -0.5)
+        // Coin haut-gauche-arrière
+        // Positionné à l'intérieur du bloc pour rester dans la case
+        // Largeur 0.16, donc position à -0.5 + 0.08 = -0.42 sur X et Y
+        // Profondeur 0.08, donc position à -0.5 + 0.04 = -0.46 sur Z
         decoElements.push(
-          <mesh key="corner-deco-tl" name="cornerDecoTL" position={[-0.5, 0.5, -0.5]} castShadow>
-            <boxGeometry args={[0.18, 0.18, 0.04]} />
+          <mesh key="corner-deco-tl" name="cornerDecoTL" position={[-0.42, 0.42, -0.46]} castShadow>
+            <boxGeometry args={[0.16, 0.16, 0.08]} />
             <meshStandardMaterial color={decoColor} roughness={0.85} />
           </mesh>
         );
       }
 
       if (hasTopRightCorner) {
-        // Coin haut-droit-arrière : (0.5, 0.5, -0.5)
+        // Coin haut-droit-arrière
         decoElements.push(
-          <mesh key="corner-deco-tr" name="cornerDecoTR" position={[0.5, 0.5, -0.5]} castShadow>
-            <boxGeometry args={[0.18, 0.18, 0.04]} />
+          <mesh key="corner-deco-tr" name="cornerDecoTR" position={[0.42, 0.42, -0.46]} castShadow>
+            <boxGeometry args={[0.16, 0.16, 0.08]} />
             <meshStandardMaterial color={decoColor} roughness={0.85} />
           </mesh>
         );
       }
 
       if (hasBottomLeftCorner) {
-        // Coin bas-gauche-avant : (-0.5, -0.5, 0.5)
+        // Coin bas-gauche-avant
         decoElements.push(
-          <mesh key="corner-deco-bl" name="cornerDecoBL" position={[-0.5, -0.5, 0.5]} castShadow>
-            <boxGeometry args={[0.18, 0.18, 0.04]} />
+          <mesh key="corner-deco-bl" name="cornerDecoBL" position={[-0.42, -0.42, 0.46]} castShadow>
+            <boxGeometry args={[0.16, 0.16, 0.08]} />
             <meshStandardMaterial color={decoColor} roughness={0.85} />
           </mesh>
         );
       }
 
       if (hasBottomRightCorner) {
-        // Coin bas-droit-avant : (0.5, -0.5, 0.5)
+        // Coin bas-droit-avant
         decoElements.push(
-          <mesh key="corner-deco-br" name="cornerDecoBR" position={[0.5, -0.5, 0.5]} castShadow>
-            <boxGeometry args={[0.18, 0.18, 0.04]} />
+          <mesh key="corner-deco-br" name="cornerDecoBR" position={[0.42, -0.42, 0.46]} castShadow>
+            <boxGeometry args={[0.16, 0.16, 0.08]} />
             <meshStandardMaterial color={decoColor} roughness={0.85} />
           </mesh>
         );
