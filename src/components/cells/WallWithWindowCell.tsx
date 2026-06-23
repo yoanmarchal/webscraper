@@ -39,8 +39,24 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   const towerStoneRadius = TOWER_EXTERNAL_RADIUS;
 
   // Saillie des coins - valeur ajustable pour contrôler combien les coins dépassent du mur
+  // Valeur initiale conservative : 0.005 (dépasse légèrement de la surface à -0.5/0.5)
+  // Pour ajuster : augmenter pour plus de saillie, diminuer pour moins de saillie
+  const CORNER_PROTRUSION = -0.10;
 
-  const CORNER_PROTRUSION = -0.05;
+  // Radius des arrondis pour les décorations de coin
+  // Valeur initiale conservative : 0.003 pour des arrondis subtils
+  // Pour ajuster : augmenter pour plus d'arrondi, diminuer pour des coins plus anguleux
+  const CORNER_ROUNDING_RADIUS = 0.001;
+
+  // Radius des arrondis pour les éléments principaux (fenêtres, portes)
+  // Valeur initiale : 0.015 pour un arrondi visible mais pas trop prononcé
+  // Pour ajuster : augmenter pour plus d'arrondi, diminuer pour des angles plus nets
+  const MAIN_ELEMENT_ROUNDING_RADIUS = 0.015;
+
+  // Radius des arrondis pour le bloc principal (ShapedBox)
+  // Valeur initiale : 0.12 pour un arrondi moins prononcé que le défaut (0.18)
+  // Pour ajuster : augmenter pour plus d'arrondi, diminuer pour des coins plus nets
+  const MAIN_BLOCK_EDGE_RADIUS = 0;
 
   // Déterminer le contexte du bloc pour adapter les décorations murales
   const hasLeftNeighbor = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
@@ -441,21 +457,21 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
          const cornerPos = -0.5 - CORNER_PROTRUSION;
          decoElements.push(
            <mesh key="corner-deco-tl-l0" name="cornerDecoTL-L0" position={[cornerPos, -0.32, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
+             <RoundedBox args={[0.14, 0.18, 0.14]} radius={CORNER_ROUNDING_RADIUS} smoothness={2}>
                <meshStandardMaterial color={decoColor} roughness={0.9} />
              </RoundedBox>
            </mesh>
          );
          decoElements.push(
            <mesh key="corner-deco-tl-l1" name="cornerDecoTL-L1" position={[cornerPos, 0.0, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
+             <RoundedBox args={[0.14, 0.18, 0.14]} radius={CORNER_ROUNDING_RADIUS} smoothness={2}>
                <meshStandardMaterial color={decoColor} roughness={0.9} />
              </RoundedBox>
            </mesh>
          );
          decoElements.push(
            <mesh key="corner-deco-tl-l2" name="cornerDecoTL-L2" position={[cornerPos, 0.32, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
+             <RoundedBox args={[0.14, 0.18, 0.14]} radius={CORNER_ROUNDING_RADIUS} smoothness={2}>
                <meshStandardMaterial color={decoColor} roughness={0.9} />
              </RoundedBox>
            </mesh>
@@ -575,7 +591,8 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   return (
     <group name="wallWithWindowCell" position={position}>
       <ShapedBox args={[1.0, 1.0, 1.0]} radii={radii} isIsolated={false}
-        color={cell.color ?? '#e0c996'} roughness={0.94} castShadow receiveShadow />
+        color={cell.color ?? '#e0c996'} roughness={0.94} castShadow receiveShadow
+        edgeRadius={MAIN_BLOCK_EDGE_RADIUS} />
 
       {/* Décorations murales adaptées au contexte du bloc */}
       {renderWallDecorations()}

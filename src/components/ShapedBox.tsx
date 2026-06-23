@@ -18,7 +18,7 @@ import { useMemo } from 'react';
 import type { CornerRadii } from '../utils/cellUtils';
 
 // Radius utilisé pour les coins libres dans le cas groupé
-const EDGE_R = 0.18;
+const EDGE_R = 0.15;
 // Nombre de segments par arc de coin arrondi
 const ARC_SEGS = 6;
 
@@ -31,6 +31,7 @@ interface ShapedBoxProps {
   castShadow?: boolean;
   receiveShadow?: boolean;
   materialProps?: Record<string, unknown>;
+  edgeRadius?: number; // Radius personnalisé pour les arrondis des coins
 }
 
 /**
@@ -42,6 +43,7 @@ function buildSection(
   hw: number,  // demi-largeur  (X)
   hd: number,  // demi-profondeur (Z → Y dans le plan Shape)
   radii: CornerRadii,
+  edgeRadius: number = EDGE_R,
 ): THREE.Shape {
   // Coins dans l'ordre anti-horaire (vue du dessus, Y positif vers haut de l'écran)
   // (−X,−Z) → (+X,−Z) → (+X,+Z) → (−X,+Z)
@@ -51,10 +53,10 @@ function buildSection(
     r: number;    // radius demandé
     startAngle: number;  // angle de départ de l'arc (rad)
   }> = [
-    { cx: -hw + EDGE_R, cy: -hd + EDGE_R, r: radii.backLeft,   startAngle: Math.PI },
-    { cx:  hw - EDGE_R, cy: -hd + EDGE_R, r: radii.backRight,  startAngle: Math.PI * 1.5 },
-    { cx:  hw - EDGE_R, cy:  hd - EDGE_R, r: radii.frontRight, startAngle: 0 },
-    { cx: -hw + EDGE_R, cy:  hd - EDGE_R, r: radii.frontLeft,  startAngle: Math.PI * 0.5 },
+    { cx: -hw + edgeRadius, cy: -hd + edgeRadius, r: radii.backLeft,   startAngle: Math.PI },
+    { cx:  hw - edgeRadius, cy: -hd + edgeRadius, r: radii.backRight,  startAngle: Math.PI * 1.5 },
+    { cx:  hw - edgeRadius, cy:  hd - edgeRadius, r: radii.frontRight, startAngle: 0 },
+    { cx: -hw + edgeRadius, cy:  hd - edgeRadius, r: radii.frontLeft,  startAngle: Math.PI * 0.5 },
   ];
 
   const shape = new THREE.Shape();
@@ -65,15 +67,15 @@ function buildSection(
 
     if (isRound) {
       // Arc de quart de cercle
-      const pts = arcPoints(c.cx, c.cy, EDGE_R, c.startAngle, c.startAngle + Math.PI / 2, ARC_SEGS);
+      const pts = arcPoints(c.cx, c.cy, edgeRadius, c.startAngle, c.startAngle + Math.PI / 2, ARC_SEGS);
       for (const [px, py] of pts) {
         if (first) { shape.moveTo(px, py); first = false; }
         else        { shape.lineTo(px, py); }
       }
     } else {
       // Angle droit : on va directement au coin exact
-      const cornerX = c.cx + Math.cos(c.startAngle + Math.PI / 4) * EDGE_R * Math.SQRT2;
-      const cornerY = c.cy + Math.sin(c.startAngle + Math.PI / 4) * EDGE_R * Math.SQRT2;
+      const cornerX = c.cx + Math.cos(c.startAngle + Math.PI / 4) * edgeRadius * Math.SQRT2;
+      const cornerY = c.cy + Math.sin(c.startAngle + Math.PI / 4) * edgeRadius * Math.SQRT2;
       if (first) { shape.moveTo(cornerX, cornerY); first = false; }
       else        { shape.lineTo(cornerX, cornerY); }
     }
@@ -106,6 +108,7 @@ export function ShapedBox({
   castShadow = true,
   receiveShadow = true,
   materialProps = {},
+  edgeRadius = EDGE_R,
 }: ShapedBoxProps) {
   const [w, h, d] = args;
   const mat = <meshStandardMaterial color={color} roughness={roughness} {...materialProps} />;
@@ -131,6 +134,7 @@ export function ShapedBox({
       castShadow={castShadow}
       receiveShadow={receiveShadow}
       materialProps={materialProps}
+      edgeRadius={edgeRadius}
     />
   );
 }
@@ -143,13 +147,14 @@ interface ExtrudedBlockProps {
   castShadow: boolean;
   receiveShadow: boolean;
   materialProps: Record<string, unknown>;
+  edgeRadius: number;
 }
 
-function ExtrudedBlock({ w, h, d, radii, color, roughness, castShadow, receiveShadow, materialProps }: ExtrudedBlockProps) {
+function ExtrudedBlock({ w, h, d, radii, color, roughness, castShadow, receiveShadow, materialProps, edgeRadius }: ExtrudedBlockProps) {
   const geometry = useMemo(() => {
     const hw = w / 2;
     const hd = d / 2;
-    const shape = buildSection(hw, hd, radii);
+  const shape = buildSection(hw, hd, radii, edgeRadius);
 
     const geo = new THREE.ExtrudeGeometry(shape, {
       depth: h,
@@ -167,7 +172,7 @@ function ExtrudedBlock({ w, h, d, radii, color, roughness, castShadow, receiveSh
 
     geo.computeVertexNormals();
     return geo;
-  }, [w, h, d, radii]);
+  }, [w, h, d, radii, edgeRadius]);
 
   return (
     <mesh geometry={geometry} castShadow={castShadow} receiveShadow={receiveShadow}>
