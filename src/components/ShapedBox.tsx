@@ -46,38 +46,32 @@ function buildSection(
   edgeRadius: number = EDGE_R,
 ): THREE.Shape {
   // Coins dans l'ordre anti-horaire (vue du dessus, Y positif vers haut de l'écran)
-  // (−X,−Z) → (+X,−Z) → (+X,+Z) → (−X,+Z)
   const corners: Array<{
-    cx: number;   // centre du coin en X
-    cy: number;   // centre du coin en Z (→Y dans shape)
-    r: number;    // radius demandé
-    startAngle: number;  // angle de départ de l'arc (rad)
+    cx: number; cy: number; r: number; startAngle: number; cornerX: number; cornerY: number;
   }> = [
-    { cx: -hw + edgeRadius, cy: -hd + edgeRadius, r: radii.backLeft,   startAngle: Math.PI },
-    { cx:  hw - edgeRadius, cy: -hd + edgeRadius, r: radii.backRight,  startAngle: Math.PI * 1.5 },
-    { cx:  hw - edgeRadius, cy:  hd - edgeRadius, r: radii.frontRight, startAngle: 0 },
-    { cx: -hw + edgeRadius, cy:  hd - edgeRadius, r: radii.frontLeft,  startAngle: Math.PI * 0.5 },
+    { cx: -hw + radii.frontLeft, cy: -hd + radii.frontLeft, r: radii.frontLeft, startAngle: Math.PI, cornerX: -hw, cornerY: -hd },
+    { cx:  hw - radii.frontRight, cy: -hd + radii.frontRight, r: radii.frontRight, startAngle: Math.PI * 1.5, cornerX: hw, cornerY: -hd },
+    { cx:  hw - radii.backRight, cy:  hd - radii.backRight, r: radii.backRight, startAngle: 0, cornerX: hw, cornerY: hd },
+    { cx: -hw + radii.backLeft, cy:  hd - radii.backLeft, r: radii.backLeft, startAngle: Math.PI * 0.5, cornerX: -hw, cornerY: hd },
   ];
 
   const shape = new THREE.Shape();
   let first = true;
 
   for (const c of corners) {
-    const isRound = c.r > 0.01;
+    const isRound = c.r > 0.001;
 
     if (isRound) {
-      // Arc de quart de cercle
-      const pts = arcPoints(c.cx, c.cy, edgeRadius, c.startAngle, c.startAngle + Math.PI / 2, ARC_SEGS);
+      // Arc de quart de cercle utilisant le radius spécifique
+      const pts = arcPoints(c.cx, c.cy, c.r, c.startAngle, c.startAngle + Math.PI / 2, ARC_SEGS);
       for (const [px, py] of pts) {
         if (first) { shape.moveTo(px, py); first = false; }
         else        { shape.lineTo(px, py); }
       }
     } else {
       // Angle droit : on va directement au coin exact
-      const cornerX = c.cx + Math.cos(c.startAngle + Math.PI / 4) * edgeRadius * Math.SQRT2;
-      const cornerY = c.cy + Math.sin(c.startAngle + Math.PI / 4) * edgeRadius * Math.SQRT2;
-      if (first) { shape.moveTo(cornerX, cornerY); first = false; }
-      else        { shape.lineTo(cornerX, cornerY); }
+      if (first) { shape.moveTo(c.cornerX, c.cornerY); first = false; }
+      else        { shape.lineTo(c.cornerX, c.cornerY); }
     }
   }
 

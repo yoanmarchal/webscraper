@@ -222,25 +222,25 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
           switch (face) {
             case 'front': {
-              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.frontLeft > 0.01, radii.frontRight > 0.01);
+              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.frontLeft, radii.frontRight);
               pos = [offsetX, offsetY, surfaceZ + stoneOffset];
               rot = [0, rotY, 0];
               break;
             }
             case 'back': {
-              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft > 0.01, radii.backRight > 0.01);
+              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft, radii.backRight);
               pos = [offsetX, offsetY, -(surfaceZ + stoneOffset)];
               rot = [0, Math.PI - rotY, 0];
               break;
             }
             case 'left': {
-              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft > 0.01, radii.frontLeft > 0.01);
+              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft, radii.frontLeft);
               pos = [-(surfaceZ + stoneOffset), offsetY, offsetX];
               rot = [0, Math.PI / 2 + rotY, 0];
               break;
             }
             case 'right': {
-              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backRight > 0.01, radii.frontRight > 0.01);
+              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backRight, radii.frontRight);
               pos = [surfaceZ + stoneOffset, offsetY, offsetX];
               rot = [0, -(Math.PI / 2 + rotY), 0];
               break;
@@ -451,7 +451,12 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       const hasBottomLeftCorner = !hasLeftNeighbor && !hasFrontNeighbor;
       const hasBottomRightCorner = !hasRightNeighbor && !hasFrontNeighbor;
 
-       if (hasTopLeftCorner) {
+      const showTopLeft = hasTopLeftCorner && radii.backLeft <= 0.01;
+      const showTopRight = hasTopRightCorner && radii.backRight <= 0.01;
+      const showBottomLeft = hasBottomLeftCorner && radii.frontLeft <= 0.01;
+      const showBottomRight = hasBottomRightCorner && radii.frontRight <= 0.01;
+
+       if (showTopLeft) {
          // Coin haut-gauche-arrière - saillie contrôlée par variable ajustable
          // Utilise CORNER_PROTRUSION pour un contrôle précis de la saillie
          const cornerPos = -0.5 - CORNER_PROTRUSION;
@@ -478,7 +483,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
          );
        }
 
-       if (hasTopRightCorner) {
+       if (showTopRight) {
          // Coin haut-droit-arrière
          const cornerPos = 0.5 + CORNER_PROTRUSION;
          decoElements.push(
@@ -504,7 +509,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
          );
        }
 
-       if (hasBottomLeftCorner) {
+       if (showBottomLeft) {
          // Coin bas-gauche-avant
          const cornerPos = -0.5 - CORNER_PROTRUSION;
          decoElements.push(
@@ -530,7 +535,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
          );
        }
 
-       if (hasBottomRightCorner) {
+       if (showBottomRight) {
          // Coin bas-droit-avant
          const cornerPos = 0.5 + CORNER_PROTRUSION;
          decoElements.push(

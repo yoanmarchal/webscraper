@@ -15,11 +15,11 @@ export type CellLookup = Record<string, GridCell>;
 
 export interface CornerRadii {
   /** corner (-X, -Z) */
-  backLeft:   number;
+  backLeft: number;
   /** corner (+X, -Z) */
-  backRight:  number;
+  backRight: number;
   /** corner (-X, +Z) */
-  frontLeft:  number;
+  frontLeft: number;
   /** corner (+X, +Z) */
   frontRight: number;
   /** convenience: max of all four (use for RoundedBox fallback) */
@@ -28,27 +28,42 @@ export interface CornerRadii {
   uniform: boolean;
 }
 
-const ROUNDED = 0.40;   // radius for an open (exposed) corner — très arrondi
-const SHARP   = 0.0;    // radius for a joined (interior) corner — parfaitement carré
+// Constantes d'ajustement pour les radius des murs
+export const ISOLATED_WALL_RADIUS = 0.40;             // Murs sans aucun voisin (tours) - très arrondi
+export const CONNECTED_WALL_EXPOSED_RADIUS = 0.1;     // Coins exposés des murs avec 1+ voisins - parfaitement carré
+export const CONNECTED_WALL_INTERIOR_RADIUS = 0.0;    // Coins connectés - parfaitement carré
 
 /**
  * Returns per-corner radii for a cell based on its horizontal neighbours.
  * Isolated cells get fully rounded corners (tower / pillar look).
  * Cells in a group get sharp corners where they touch neighbours and
- * rounded corners on their exposed extremities.
+ * slightly rounded (almost right angle) corners on their exposed extremities.
  */
 export function getCornerRadii(lookup: CellLookup, cell: GridCell): CornerRadii {
   const hasL = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
   const hasR = hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z);
-  const hasF = hasOccupiedCell(lookup, cell.x,     cell.y, cell.z + 1);
-  const hasB = hasOccupiedCell(lookup, cell.x,     cell.y, cell.z - 1);
+  const hasF = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
+  const hasB = hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1);
 
-  // FINAL CONSERVATIVE LOGIC - only round corners that are truly exposed
-  // This is the safest approach that avoids unwanted rounding on adjacent walls
-  const backLeft   = (!hasL && !hasB) ? ROUNDED : SHARP;
-  const backRight  = (!hasR && !hasB) ? ROUNDED : SHARP;
-  const frontLeft  = (!hasL && !hasF) ? ROUNDED : SHARP;
-  const frontRight = (!hasR && !hasF) ? ROUNDED : SHARP;
+  const numAdjacent = Number(hasL) + Number(hasR) + Number(hasF) + Number(hasB);
+
+  // Les murs qui n'ont aucun mur adjacent doivent être très arrondis (ex: tours)
+  if (numAdjacent === 0) {
+    return {
+      backLeft: ISOLATED_WALL_RADIUS,
+      backRight: ISOLATED_WALL_RADIUS,
+      frontLeft: ISOLATED_WALL_RADIUS,
+      frontRight: ISOLATED_WALL_RADIUS,
+      max: ISOLATED_WALL_RADIUS,
+      uniform: true
+    };
+  }
+
+  // Les murs qui ont 1 ou plusieurs murs adjacents doivent être "presque un angle droit" sur leurs parties exposées
+  const backLeft = (!hasL && !hasB) ? CONNECTED_WALL_EXPOSED_RADIUS : CONNECTED_WALL_INTERIOR_RADIUS;
+  const backRight = (!hasR && !hasB) ? CONNECTED_WALL_EXPOSED_RADIUS : CONNECTED_WALL_INTERIOR_RADIUS;
+  const frontLeft = (!hasL && !hasF) ? CONNECTED_WALL_EXPOSED_RADIUS : CONNECTED_WALL_INTERIOR_RADIUS;
+  const frontRight = (!hasR && !hasF) ? CONNECTED_WALL_EXPOSED_RADIUS : CONNECTED_WALL_INTERIOR_RADIUS;
 
   const max = Math.max(backLeft, backRight, frontLeft, frontRight);
   const uniform = backLeft === backRight && backRight === frontLeft && frontLeft === frontRight;
@@ -89,18 +104,18 @@ export function getRoofConfig(lookup: CellLookup, cell: GridCell): {
   const hasRight = hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z);
   const hasFront = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
   const hasBack = hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1);
-  
+
   const eastWest = Number(hasLeft) + Number(hasRight);
   const northSouth = Number(hasFront) + Number(hasBack);
-  
+
   // Détecte si c'est un coin (voisins perpendiculaires)
   const isCorner = (eastWest === 1 && northSouth === 1);
-  
+
   // Détecte si c'est une extrémité (voisin sur un seul côté)
   const isEnd = (eastWest + northSouth === 1);
-  
+
   const axis = eastWest > northSouth ? 'x' : 'z';
-  
+
   return { axis, hasLeft, hasRight, hasFront, hasBack, isCorner, isEnd };
 }
 
@@ -116,7 +131,7 @@ export function getArchAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
   if (northSouth > eastWest) {
     return 'x';
   }
-  
+
   // Si égal, choisir en fonction de la position pour une cohérence visuelle
   return 'z';
 }
@@ -124,21 +139,21 @@ export function getArchAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
 // Détecte les faces exposées d'un bloc (sans voisin adjacent)
 export function getExposedFaces(lookup: CellLookup, cell: GridCell): Array<'front' | 'back' | 'left' | 'right'> {
   const faces: Array<'front' | 'back' | 'left' | 'right'> = [];
-  
+
   if (!hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1)) faces.push('front');  // Z+
   if (!hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1)) faces.push('back');   // Z-
   if (!hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z)) faces.push('left');   // X-
   if (!hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z)) faces.push('right');  // X+
-  
+
   return faces;
 }
 
 // Détecte si un bloc est isolé (aucun voisin horizontal)
 export function isIsolatedBlock(lookup: CellLookup, cell: GridCell): boolean {
   return !hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z) &&
-         !hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z) &&
-         !hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1) &&
-         !hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
+    !hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z) &&
+    !hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1) &&
+    !hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
 }
 
 /**
@@ -184,26 +199,31 @@ export { EDGE_R, FLAT_LIMIT };
  */
 export function projectOnFace(
   t: number,
-  cornerRoundedNeg: boolean,
-  cornerRoundedPos: boolean,
+  radiusNeg: number,
+  radiusPos: number,
 ): { surfaceZ: number; rotY: number } {
-  if (t > FLAT_LIMIT && cornerRoundedPos) {
-    // Zone de coin arrondi côté positif
-    const dx = Math.min(t - FLAT_LIMIT, EDGE_R);
-    const theta = Math.asin(dx / EDGE_R);
-    return {
-      surfaceZ: FLAT_LIMIT + EDGE_R * Math.cos(theta),
-      rotY: theta,
-    };
-  } else if (t < -FLAT_LIMIT && cornerRoundedNeg) {
-    // Zone de coin arrondi côté négatif
-    const dx = Math.max(t + FLAT_LIMIT, -EDGE_R);
-    const theta = Math.asin(dx / EDGE_R);
-    return {
-      surfaceZ: FLAT_LIMIT + EDGE_R * Math.cos(theta),
-      rotY: theta,
-    };
+  if (t > 0 && radiusPos > 0.001) {
+    const flatLimit = 0.5 - radiusPos;
+    if (t > flatLimit) {
+      const dx = t - flatLimit; // 0 to radiusPos
+      const dz = Math.sqrt(Math.max(0, radiusPos * radiusPos - dx * dx));
+      const theta = Math.asin(dx / radiusPos);
+      return {
+        surfaceZ: flatLimit + dz,
+        rotY: theta,
+      };
+    }
+  } else if (t < 0 && radiusNeg > 0.001) {
+    const flatLimit = -0.5 + radiusNeg;
+    if (t < flatLimit) {
+      const dx = flatLimit - t; // positive, 0 to radiusNeg
+      const dz = Math.sqrt(Math.max(0, radiusNeg * radiusNeg - dx * dx));
+      const theta = Math.asin(dx / radiusNeg);
+      return {
+        surfaceZ: 0.5 - radiusNeg + dz,
+        rotY: -theta,
+      };
+    }
   }
-  // Zone plate (pas de coin arrondi)
   return { surfaceZ: 0.5, rotY: 0 };
 }
