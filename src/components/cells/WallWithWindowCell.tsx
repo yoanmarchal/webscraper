@@ -41,7 +41,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   // Saillie des coins - valeur ajustable pour contrôler combien les coins dépassent du mur
   // Valeur initiale conservative : 0.005 (dépasse légèrement de la surface à -0.5/0.5)
   // Pour ajuster : augmenter pour plus de saillie, diminuer pour moins de saillie
-  const CORNER_PROTRUSION = -0.10;
+  const CORNER_PROTRUSION = -0.05;
 
   // Radius des arrondis pour les décorations de coin
   // Valeur initiale conservative : 0.003 pour des arrondis subtils
@@ -56,7 +56,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   // Radius des arrondis pour le bloc principal (ShapedBox)
   // Valeur initiale : 0.12 pour un arrondi moins prononcé que le défaut (0.18)
   // Pour ajuster : augmenter pour plus d'arrondi, diminuer pour des coins plus nets
-  const MAIN_BLOCK_EDGE_RADIUS = 0;
+  const MAIN_BLOCK_EDGE_RADIUS = 0.12;
 
   // Déterminer le contexte du bloc pour adapter les décorations murales
   const hasLeftNeighbor = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);

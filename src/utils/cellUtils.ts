@@ -29,7 +29,7 @@ export interface CornerRadii {
 }
 
 const ROUNDED = 0.40;   // radius for an open (exposed) corner — très arrondi
-const SHARP   = 0.005;  // radius for a joined (interior) corner — quasi carré
+const SHARP   = 0.0;    // radius for a joined (interior) corner — parfaitement carré
 
 /**
  * Returns per-corner radii for a cell based on its horizontal neighbours.
@@ -43,7 +43,8 @@ export function getCornerRadii(lookup: CellLookup, cell: GridCell): CornerRadii 
   const hasF = hasOccupiedCell(lookup, cell.x,     cell.y, cell.z + 1);
   const hasB = hasOccupiedCell(lookup, cell.x,     cell.y, cell.z - 1);
 
-  // A corner is rounded only when BOTH its adjacent sides are free
+  // FINAL CONSERVATIVE LOGIC - only round corners that are truly exposed
+  // This is the safest approach that avoids unwanted rounding on adjacent walls
   const backLeft   = (!hasL && !hasB) ? ROUNDED : SHARP;
   const backRight  = (!hasR && !hasB) ? ROUNDED : SHARP;
   const frontLeft  = (!hasL && !hasF) ? ROUNDED : SHARP;
