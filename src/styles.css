@@ -67,7 +67,7 @@ input {
 
 .floating-clear-button {
   position: absolute;
-  top: 18px;
+  bottom: 18px;
   right: 18px;
   z-index: 5;
   border: 1px solid rgba(139, 111, 71, 0.4);
@@ -90,6 +90,7 @@ input {
 .floating-buttons {
   position: absolute;
   top: 18px;
+  bottom: 18px;
   right: 18px;
   z-index: 5;
   display: flex;
@@ -145,8 +146,8 @@ input {
 /* Control Panel Styles */
 .control-panel {
   position: absolute;
-  top: 20px;
-  right: 250px;
+  top: 112px;
+  right: 20px;
   z-index: 10;
   background: rgba(255, 255, 255, 0.9);
   border-radius: 12px;

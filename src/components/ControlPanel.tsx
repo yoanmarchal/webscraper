@@ -3,8 +3,6 @@ import { useState } from 'react';
 interface ControlPanelProps {
   gridSize: number;
   onGridSizeChange: (size: number) => void;
-  generationSeed: number;
-  onGenerationSeedChange: (seed: number) => void;
   showPerfMonitor: boolean;
   onTogglePerfMonitor: (show: boolean) => void;
 }
@@ -12,8 +10,6 @@ interface ControlPanelProps {
 export function ControlPanel({
   gridSize,
   onGridSizeChange,
-  generationSeed,
-  onGenerationSeedChange,
   showPerfMonitor,
   onTogglePerfMonitor,
 }: ControlPanelProps) {
@@ -41,20 +37,6 @@ export function ControlPanel({
               onChange={(e) => onGridSizeChange(parseInt(e.target.value))}
             />
             <small>Controls grid dimensions (2x2, 3x3, etc.)</small>
-          </div>
-
-
-          <div className="control-item">
-            <label>Generation Seed: {generationSeed}</label>
-            <input
-              type="range"
-              min="0"
-              max="1000"
-              step="1"
-              value={generationSeed}
-              onChange={(e) => onGenerationSeedChange(parseInt(e.target.value))}
-            />
-            <small>Change pattern before generating</small>
           </div>
         </div>
 

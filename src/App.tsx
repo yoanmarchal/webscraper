@@ -9,7 +9,6 @@ export function App() {
   const [, setRenderTick] = useState(0);
   const [previewCell, setPreviewCell] = useState<{ x: number; z: number } | null>(null);
   const [gridSize, setGridSize] = useState(2);
-  const [generationSeed, setGenerationSeed] = useState(42);
   const [showPerfMonitor, setShowPerfMonitor] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -63,7 +62,7 @@ export function App() {
               await new Promise(resolve => setTimeout(resolve, 50));
 
               // Generate terrain in chunks to prevent UI freezing
-              grid.generateTerrain(generationSeed, 2, gridSize);
+              grid.generateTerrain(42, 2, gridSize);
               refreshScene();
 
               setIsGenerating(false);
@@ -98,8 +97,6 @@ export function App() {
       <ControlPanel
         gridSize={gridSize}
         onGridSizeChange={setGridSize}
-        generationSeed={generationSeed}
-        onGenerationSeedChange={setGenerationSeed}
         showPerfMonitor={showPerfMonitor}
         onTogglePerfMonitor={setShowPerfMonitor}
       />
