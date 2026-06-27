@@ -3,8 +3,6 @@ import { useState } from 'react';
 interface ControlPanelProps {
   gridSize: number;
   onGridSizeChange: (size: number) => void;
-  noiseScale: number;
-  onNoiseScaleChange: (scale: number) => void;
   generationSeed: number;
   onGenerationSeedChange: (seed: number) => void;
   showPerfMonitor: boolean;
@@ -14,8 +12,6 @@ interface ControlPanelProps {
 export function ControlPanel({
   gridSize,
   onGridSizeChange,
-  noiseScale,
-  onNoiseScaleChange,
   generationSeed,
   onGenerationSeedChange,
   showPerfMonitor,
@@ -47,18 +43,6 @@ export function ControlPanel({
             <small>Controls grid dimensions (2x2, 3x3, etc.)</small>
           </div>
 
-          <div className="control-item">
-            <label>Noise Scale: {noiseScale.toFixed(1)}</label>
-            <input
-              type="range"
-              min="0.1"
-              max="5.0"
-              step="0.1"
-              value={noiseScale}
-              onChange={(e) => onNoiseScaleChange(parseFloat(e.target.value))}
-            />
-            <small>Adjust before generating terrain</small>
-          </div>
 
           <div className="control-item">
             <label>Generation Seed: {generationSeed}</label>

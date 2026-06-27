@@ -205,7 +205,7 @@ export class VillageGrid {
     }
   }
 
-  public generateTerrain(seed: number, noiseScale: number, heightScale: number = 3, gridSize: number = 2): void {
+  public generateTerrain(seed: number, heightScale: number = 3, gridSize: number = 2): void {
     this.clear();
     this.noiseGenerator = new PerlinNoise(seed);
 
@@ -222,11 +222,11 @@ export class VillageGrid {
     }
   }
 
-  public updateNoiseParameters(seed: number, noiseScale: number, gridSize: number = 2): void {
+  public updateNoiseParameters(seed: number, gridSize: number = 2): void {
     this.noiseGenerator = new PerlinNoise(seed);
 
     // Regenerate terrain with new parameters including grid size
-    this.generateTerrain(seed, noiseScale, 2, gridSize);
+    this.generateTerrain(seed, 2, gridSize);
   }
 
   public getGrid(): GridCell[][][] {
