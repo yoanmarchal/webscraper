@@ -349,8 +349,10 @@ export class VillageGrid {
             // Bloc le plus haut d'une colonne → toit
             cell.type = BlockType.Roof;
           } else if (horizontalNeighborCount < 4) {
-            // Murs avec fenêtres pour les façades visibles
-            cell.type = BlockType.WallWithWindow;
+            // NEW RULE: Only show windows on one block per floor when adjacent
+            // Check if there's already a window on this floor in adjacent columns
+            const hasWindowOnSameFloor = this.hasWindowOnSameFloor(x, y, z, hasLeftNeighbor, hasRightNeighbor, hasFrontNeighbor, hasBackNeighbor);
+            cell.type = hasWindowOnSameFloor ? BlockType.Wall : BlockType.WallWithWindow;
           } else {
             // Murs pleins pour les intérieurs
             cell.type = BlockType.Wall;
@@ -441,5 +443,48 @@ export class VillageGrid {
 
   private isValidCoordinate(x: number, y: number, z: number): boolean {
     return x >= 0 && x < this.sizeX && y >= 0 && y < this.sizeY && z >= 0 && z < this.sizeZ;
+  }
+
+  /**
+   * Check if there's already a window on the same floor in adjacent blocks
+   * This implements the rule: only one window per floor when blocks are adjacent
+   */
+  private hasWindowOnSameFloor(x: number, y: number, z: number,
+                              hasLeft: boolean, hasRight: boolean,
+                              hasFront: boolean, hasBack: boolean): boolean {
+    // Check left neighbor on same floor
+    if (hasLeft) {
+      const leftCell = this.getNeighborCell(x - 1, y, z);
+      if (leftCell?.type === BlockType.WallWithWindow) {
+        return true;
+      }
+    }
+
+    // Check right neighbor on same floor
+    if (hasRight) {
+      const rightCell = this.getNeighborCell(x + 1, y, z);
+      if (rightCell?.type === BlockType.WallWithWindow) {
+        return true;
+      }
+    }
+
+    // Check front neighbor on same floor
+    if (hasFront) {
+      const frontCell = this.getNeighborCell(x, y, z - 1);
+      if (frontCell?.type === BlockType.WallWithWindow) {
+        return true;
+      }
+    }
+
+    // Check back neighbor on same floor
+    if (hasBack) {
+      const backCell = this.getNeighborCell(x, y, z + 1);
+      if (backCell?.type === BlockType.WallWithWindow) {
+        return true;
+      }
+    }
+
+    // No window found on same floor
+    return false;
   }
 }
