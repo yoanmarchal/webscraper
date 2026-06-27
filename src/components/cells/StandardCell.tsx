@@ -317,18 +317,18 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
 
   // Tour isolée - aspect de tour même pour les murs simples
   if (isIsolated) {
-    return (
-      <group name="standardCellIsolated" position={position}>
-        {/* Corps principal : cylindre moins rond pour plus de réalisme */}
-        <ShapedBox
-          args={[1.0, 1.0, 1.0]}
-          radii={radii}
-          isIsolated={true}
-          color={baseColor}
-          roughness={0.94}
-          castShadow
-          receiveShadow
-        />
+        return (
+          <group name="standardCellIsolated" position={position}>
+            {/* Corps principal : cylindre moins rond pour plus de réalisme */}
+            <ShapedBox
+              args={[1.0, 1.0, 1.0]}
+              radii={radii}
+              isIsolated={true}
+              color={baseColor}
+              roughness={0.94}
+              castShadow
+              receiveShadow
+            />
 
         {/* Éléments décoratifs : bande horizontale avec meilleur arrondi et visibilité */}
         {!isFoundation && (

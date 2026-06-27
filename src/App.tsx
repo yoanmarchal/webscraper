@@ -1,16 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { VillageGrid } from './villageGrid';
 import { VoxelScene } from './components/VoxelScene';
+import { ControlPanel } from './components/ControlPanel';
 
-const GRID_WIDTH = 20;
 const GRID_HEIGHT = 10;
-const GRID_DEPTH = 20;
-
-const grid = new VillageGrid(GRID_WIDTH, GRID_HEIGHT, GRID_DEPTH);
 
 export function App() {
   const [, setRenderTick] = useState(0);
   const [previewCell, setPreviewCell] = useState<{ x: number; z: number } | null>(null);
+  const [gridSize, setGridSize] = useState(2);
+  const [noiseScale, setNoiseScale] = useState(2.0);
+  const [generationSeed, setGenerationSeed] = useState(42);
+  const [showPerfMonitor, setShowPerfMonitor] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Create VillageGrid with dynamic size based on gridSize
+  const [grid, setGrid] = useState(() => new VillageGrid(gridSize, GRID_HEIGHT, gridSize));
+
+  // Recreate grid when gridSize changes
+  useEffect(() => {
+    setGrid(new VillageGrid(gridSize, GRID_HEIGHT, gridSize));
+  }, [gridSize]);
+
+  // Note: Terrain generation is now manual only via the "Generate Terrain" button
+  // This prevents performance issues from automatic regeneration
 
   const refreshScene = () => setRenderTick((tick) => tick + 1);
 
@@ -29,29 +42,70 @@ export function App() {
   return (
     <div className="app-shell compact-shell">
       <div className="canvas-frame">
-        <button
-          type="button"
-          className="floating-clear-button"
-          onClick={() => {
-            grid.clear();
-            refreshScene();
-          }}
-        >
-          Clear
-        </button>
-        <VoxelScene
+        <div className="floating-buttons">
+          <button
+            type="button"
+            className="floating-clear-button"
+            onClick={() => {
+              grid.clear();
+              refreshScene();
+            }}
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            className="floating-generate-button"
+            onClick={async () => {
+              if (isGenerating) return;
+              setIsGenerating(true);
+
+              // Use setTimeout to yield to browser for UI update
+              await new Promise(resolve => setTimeout(resolve, 50));
+
+              // Generate terrain in chunks to prevent UI freezing
+              grid.generateTerrain(generationSeed, noiseScale, 2, gridSize);
+              refreshScene();
+
+              setIsGenerating(false);
+            }}
+            disabled={isGenerating}
+          >
+            {isGenerating ? 'Generating...' : 'Generate Terrain'}
+          </button>
+        </div>
+          <VoxelScene
           cells={cells}
-          gridWidth={GRID_WIDTH}
-          gridDepth={GRID_DEPTH}
+          gridWidth={gridSize}
+          gridDepth={gridSize}
           selectedHeight={0}
           onCellAction={handleCellAction}
-          onPreviewMove={(x, z) => setPreviewCell({ x, z })}
+          onPreviewMove={(x, z) => {
+            // Only allow preview within the selected grid size
+            if (x < gridSize && z < gridSize) {
+              setPreviewCell({ x, z });
+            } else {
+              setPreviewCell(null);
+            }
+          }}
           previewCell={previewCell}
           toWorldPosition={(x, y, z) => grid.toWorldPosition(x, y, z)}
           getNextPlacementY={(x, z, minimumY) => grid.getNextPlacementY(x, z, minimumY)}
           getTopOccupiedY={(x, z) => grid.getTopOccupiedY(x, z)}
+          gridSize={gridSize}
+          showPerfMonitor={showPerfMonitor}
         />
       </div>
+      <ControlPanel
+        gridSize={gridSize}
+        onGridSizeChange={setGridSize}
+        noiseScale={noiseScale}
+        onNoiseScaleChange={setNoiseScale}
+        generationSeed={generationSeed}
+        onGenerationSeedChange={setGenerationSeed}
+        showPerfMonitor={showPerfMonitor}
+        onTogglePerfMonitor={setShowPerfMonitor}
+      />
     </div>
   );
 }

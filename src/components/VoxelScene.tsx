@@ -7,6 +7,7 @@ import { PlacementPreview } from './PlacementPreview';
 import { Bloom, EffectComposer, Noise, Vignette, SSAO   } from '@react-three/postprocessing'
 import { DotScreen } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
+import { Perf } from 'r3f-perf';
 
 interface VoxelSceneProps {
   cells: GridCell[];
@@ -19,6 +20,8 @@ interface VoxelSceneProps {
   toWorldPosition: (x: number, y: number, z: number) => [number, number, number];
   getNextPlacementY: (x: number, z: number, minimumY: number) => number | null;
   getTopOccupiedY: (x: number, z: number) => number | null;
+  gridSize?: number;
+  showPerfMonitor?: boolean;
 }
 
 export function VoxelScene({
@@ -32,6 +35,8 @@ export function VoxelScene({
   toWorldPosition,
   getNextPlacementY,
   getTopOccupiedY,
+  gridSize = 2,
+  showPerfMonitor = false,
 }: VoxelSceneProps) {
   const handlePointer = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
@@ -62,6 +67,7 @@ export function VoxelScene({
     >
       <color attach="background" args={['#b8d4f1']} />
       <fog attach="fog" args={['#d0e5f5', 30, 60]} />
+      {showPerfMonitor && <Perf position="top-left" />}
       <ambientLight intensity={1.3} color="#fffaed" />
       <directionalLight 
         position={[12, 16, 10]} 
@@ -74,15 +80,15 @@ export function VoxelScene({
         shadow-bias={-0.0001}
       />
       <Sky distance={450000} sunPosition={[100, 20, 100]} inclination={0.6} azimuth={0.25} turbidity={8} rayleigh={1.2} />
-      <gridHelper args={[Math.max(gridWidth, gridDepth), Math.max(gridWidth, gridDepth), '#d4c4a8', '#e8dcc8']} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} onPointerMove={handlePointer} onPointerDown={handlePointer} receiveShadow>
-        <planeGeometry args={[gridWidth, gridDepth]} />
+        <gridHelper args={[Math.max(gridWidth, gridDepth), Math.max(gridWidth, gridDepth), '#d4c4a8', '#e8dcc8']} />
+        <mesh rotation={[-Math.PI / 2, 0, 0]} onPointerMove={handlePointer} onPointerDown={handlePointer} receiveShadow>
+          <planeGeometry args={[gridWidth, gridDepth]} />
         <meshStandardMaterial color="#f5e6d3" transparent opacity={0.95} roughness={0.95} />
       </mesh>
       {(() => {
         const lookup = makeCellLookup(cells);
         return cells.map((cell) => (
-          <CellMesh key={`${cell.x}-${cell.y}-${cell.z}`} cell={cell} toWorldPosition={toWorldPosition} lookup={lookup} />
+          <CellMesh key={`${cell.x}-${cell.y}-${cell.z}`} cell={cell} toWorldPosition={(x, y, z) => toWorldPosition(x, y, z)} lookup={lookup} />
         ));
       })()}
       <PlacementPreview
