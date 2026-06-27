@@ -5,6 +5,8 @@ import { makeCellLookup } from '../utils/cellUtils';
 import { CellMesh } from './CellMesh';
 import { PlacementPreview } from './PlacementPreview';
 import { Bloom, EffectComposer, Noise, Vignette, SSAO   } from '@react-three/postprocessing'
+import { DotScreen } from '@react-three/postprocessing'
+import { BlendFunction } from 'postprocessing'
 
 interface VoxelSceneProps {
   cells: GridCell[];
@@ -94,7 +96,11 @@ export function VoxelScene({
         <Noise opacity={0.02} />
         <Vignette eskil={false} offset={0.1} darkness={0.5} />
       </EffectComposer>
-
+  <DotScreen
+    blendFunction={BlendFunction.NORMAL} // blend mode
+    angle={Math.PI * 0.5} // angle of the dot pattern
+    scale={1.0} // scale of the dot pattern
+  />
     </Canvas>
   );
 }
