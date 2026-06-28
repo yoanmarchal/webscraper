@@ -93,7 +93,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   // 🔢 Pour changer facilement le nombre de pierres par face : remplacer
   // `undefined` par un nombre fixe (ex: 5) ou une fonction (cell, faceIdx) => n.
   // `undefined` conserve le comportement d'origine (3 à 5 pierres selon seed).
-  const STONES_PER_FACE: number | undefined = 10;
+  const STONES_PER_FACE = 25; // Plus grand nombre de tentatives pour combler les espaces libres
 
   const renderStonePatches = (hasBands: boolean, renderContext: 'tower' | 'wall' = 'wall') => {
     if (exposedFaces.length === 0) return null;
@@ -121,7 +121,8 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         width: base.width * (0.85 + (h1 % 20) / 100),
         height: base.height * (0.8 + (h2 % 15) / 100),
       }),
-      distance: { xBase: 0.2, xModRange: 18, yBase: 0.18, yModRange: 16 },
+      // On couvre toute la face pour permettre aux pierres de se placer autour de la fenêtre
+      distance: { xBase: 0, xModRange: 45, yBase: 0, yModRange: 45 },
       visual: {
         thickness: 0.025,
         cornerRadius: 0.012,
@@ -143,8 +144,12 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         }
 
         if (isInProtectedArea(area, x, y, w, h)) return true;
-        if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandTop, x, y, w, h)) return true;
-        if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandBottom, x, y, w, h)) return true;
+        
+        if (hasBands) {
+          if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandTop, x, y, w, h)) return true;
+          if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandBottom, x, y, w, h)) return true;
+        }
+        
         return false;
       },
     });

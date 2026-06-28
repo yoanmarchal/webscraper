@@ -167,6 +167,8 @@ export function renderStonePatches(config: StonePatchesConfig) {
         ? stonesPerFace(cell, faceIdx)
         : stonesPerFace ?? defaultStonesPerFace(cell);
 
+    const placedStones: { x: number; y: number; w: number; h: number }[] = [];
+
     for (let i = 0; i < count; i++) {
       const seed = Math.abs(
         cell.x * seedSalt.x +
@@ -183,19 +185,44 @@ export function renderStonePatches(config: StonePatchesConfig) {
         ? computeSize(h1, h2, h3, baseSize)
         : defaultComputeSize(h1, h2, h3, baseSize);
 
-      // Position dans les quadrants, en évitant le centre
+      // Position dans les quadrants pour les 4 premiers, puis aléatoire (basé sur le hash)
       const quadrant = i % 4;
-      const signX = quadrant === 0 || quadrant === 2 ? -1 : 1;
-      const signY = quadrant === 0 || quadrant === 1 ? -1 : 1;
+      const signX = i < 4 ? (quadrant === 0 || quadrant === 2 ? -1 : 1) : (h1 % 2 === 0 ? -1 : 1);
+      const signY = i < 4 ? (quadrant === 0 || quadrant === 1 ? -1 : 1) : (h2 % 2 === 0 ? -1 : 1);
       const distX = distance.xBase + (h1 % distance.xModRange) * 0.01;
       const distY = distance.yBase + (h2 % distance.yModRange) * 0.01;
-      const offsetX = signX * distX;
-      const offsetY = signY * distY;
+      const rawOffsetX = signX * distX;
+      const rawOffsetY = signY * distY;
+
+      // Alignement sur une grille (appareillage en quinconce)
+      const rowHeight = baseSize.height * 1.25;
+      const colWidth = baseSize.width * 1.15;
+      
+      const rowIndex = Math.round(rawOffsetY / rowHeight);
+      const offsetY = rowIndex * rowHeight;
+      
+      const isEvenRow = Math.abs(rowIndex) % 2 === 0;
+      const rowOffsetX = isEvenRow ? 0 : colWidth / 2;
+      
+      const colIndex = Math.round((rawOffsetX - rowOffsetX) / colWidth);
+      const offsetX = colIndex * colWidth + rowOffsetX;
+
+      // Anti-superposition avec les autres pierres de la même face
+      const isOverlapping = placedStones.some(
+        (stone) =>
+          Math.abs(offsetX - stone.x) < (w + stone.w) / 2 + 0.01 &&
+          Math.abs(offsetY - stone.y) < (h + stone.h) / 2 + 0.01
+      );
+      if (isOverlapping) {
+        continue;
+      }
 
       // 🔒 Sécurité : ne jamais placer une pierre dans une zone protégée
       if (isInProtectedZone(face, offsetX, offsetY, w, h)) {
         continue;
       }
+
+      placedStones.push({ x: offsetX, y: offsetY, w, h });
 
       const key = `stone-${face}-${faceIdx}-${i}`;
 
