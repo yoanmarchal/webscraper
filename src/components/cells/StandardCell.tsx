@@ -5,12 +5,12 @@ import {
   hasOccupiedCell, 
   getExposedFaces, 
   getCornerRadii,
-  projectOnFace,
   FLAT_LIMIT 
 } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
 import { STANDARD_PROTECTED_AREAS, checkInProtectedZones } from '../../config/protectedAreasConfig';
+import { renderStonePatches as renderStonePatchesShared } from '../../utils/stonePatches';
 
 interface StandardCellProps {
   cell: GridCell;
@@ -29,6 +29,44 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
 
   // ── Shape inheritance: corner radii driven by neighbours ──────────────────
   const radii = getCornerRadii(lookup, cell);
+
+  // 🔢 Pour changer facilement le nombre de pierres par face : remplacer
+  // `undefined` par un nombre fixe (ex: 5) ou une fonction (cell, faceIdx) => n.
+  // `undefined` conserve le comportement d'origine (3 à 5 pierres selon seed).
+  const STONES_PER_FACE: number | undefined = 10;
+
+  const renderStonePatches = () => {
+    const exposedFaces = getExposedFaces(lookup, cell);
+    if (exposedFaces.length === 0) return null;
+
+    // Seul le style STONE affiche les pierres apparentes
+    const hasStoneStyle = cell.propertyBundle?.decorationStyle === 'STONE';
+    if (!hasStoneStyle) return null;
+
+    return renderStonePatchesShared({
+      cell,
+      exposedFaces,
+      isIsolated,
+      radii,
+      // Les murs standards ne raisonnent qu'en "coin arrondi oui/non",
+      // pas en amplitude exacte du radius → mode booléen.
+      cornerMode: 'boolean',
+      towerRadius: 0.502,
+      wallSurfaceOffset: 0.003,
+      stonesPerFace: STONES_PER_FACE,
+      baseSize: { width: 0.14, height: 0.09 },
+      visual: {
+        thickness: 0.012,
+        cornerRadius: 0.004,
+        smoothness: 2,
+        color: patchColor,
+        roughness: 0.95,
+      },
+      // 🔒 Zone protégée propre à StandardCell (quoins, base trim, etc.)
+      isInProtectedZone: (face, x, y, w, h) =>
+        checkInProtectedZones(STANDARD_PROTECTED_AREAS, x, y, w, h),
+    });
+  };
 
   const renderQuoins = () => {
     // Vérifier si le propertyBundle existe et si nous devons supprimer les quoins
@@ -97,174 +135,7 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
     });
   };
 
-  const renderStonePatches = () => {
-    const exposedFaces = getExposedFaces(lookup, cell);
-    if (exposedFaces.length === 0) return null;
 
-    // Seul le style STONE affiche les pierres apparentes
-    const hasStoneStyle = cell.propertyBundle?.decorationStyle === 'STONE';
-    if (!hasStoneStyle) return null;
-
-    const stones: any[] = [];
-
-    // Utiliser la configuration centralisée des zones protégées
-    const PROTECTED_AREAS = STANDARD_PROTECTED_AREAS;
-
-    /**
-     * Vérifie si une position (x, y) sur une face est dans une zone protégée
-     * Utilise la fonction centralisée checkInProtectedZones
-     */
-    const isInProtectedZone = (
-      face: string,
-      x: number,
-      y: number,
-      stoneWidth: number,
-      stoneHeight: number
-    ): boolean => {
-      return checkInProtectedZones(PROTECTED_AREAS, x, y, stoneWidth, stoneHeight);
-    };
-
-    // Taille de base des pierres
-    const baseW = 0.14;
-    const baseH = 0.09;
-
-    // Nombre de pierres par face (3-5 selon seed)
-    const stonesPerFace = 3 + (Math.abs(cell.x * 3 + cell.z * 7) % 3);
-
-    exposedFaces.forEach((face, faceIdx) => {
-      for (let i = 0; i < stonesPerFace; i++) {
-        // Hash déterministe par face + pierre
-        const seed = Math.abs(cell.x * 17 + cell.y * 31 + cell.z * 47 + faceIdx * 23 + i * 59);
-        const h1 = seed % 100;
-        const h2 = (seed * 7 + 13) % 100;
-        const h3 = (seed * 3 + 41) % 100;
-
-        // Variation de taille
-        const w = baseW + (h2 % 5) * 0.018; // 0.14 → 0.21
-        const h = baseH + (h3 % 4) * 0.012; // 0.09 → 0.14
-
-        // Position dans les quadrants, évitant le centre
-        const quadrant = i % 4;
-        const signX = (quadrant === 0 || quadrant === 2) ? -1 : 1;
-        const signY = (quadrant === 0 || quadrant === 1) ? -1 : 1;
-        const distX = 0.20 + (h1 % 20) * 0.01; // 0.20 → 0.39
-        const distY = 0.18 + (h2 % 18) * 0.01;
-        const offsetX = signX * distX;
-        const offsetY = signY * distY;
-
-        // Vérifier si cette pierre est dans une zone protégée (coin ou base trim)
-        if (isInProtectedZone(face, offsetX, offsetY, w, h)) {
-          continue; // Sauter cette pierre
-        }
-
-
-        if (isIsolated) {
-          // ── Tour cylindrique : projection de offsetX sur la surface du cylindre ─
-          // Même logique que les murs plats : offsetX est la position latérale
-          // sur la face, projetée sur le cercle via asin(t/r).
-          const faceAngles: Record<string, number> = {
-            front: 0, back: Math.PI, right: Math.PI / 2, left: -Math.PI / 2,
-          };
-          const baseFaceAngle = faceAngles[face] ?? 0;
-
-          // Le signe de la projection dépend de la face pour garder la
-          // cohérence avec la direction latérale sur chaque face :
-          //   front : X+ → angle+   back  : X+ → angle-
-          //   left  : Z+ → angle+   right : Z+ → angle-
-          const lateralSign = (face === 'back' || face === 'right') ? -1 : 1;
-
-          const radius = 0.502;
-          // Clamp pour éviter asin hors domaine
-          const safeT = Math.max(-radius * 0.95, Math.min(radius * 0.95, offsetX));
-          const angle = baseFaceAngle + lateralSign * Math.asin(safeT / radius);
-
-          const posX = Math.sin(angle) * radius;
-          const posZ = Math.cos(angle) * radius;
-          const rotY = angle;
-
-          stones.push(
-            <mesh
-              key={`stone-${face}-${i}`}
-              name={`stonePatch-${face}-${i}`}
-              position={[posX, offsetY, posZ]}
-              rotation={[0, rotY, 0]}
-              castShadow
-              receiveShadow
-            >
-              <RoundedBox args={[w, h, 0.012]} radius={0.004} smoothness={2}>
-                <meshStandardMaterial color={patchColor} roughness={0.95} />
-              </RoundedBox>
-            </mesh>
-          );
-        } else {
-          // ── Mur avec coins éventuellement arrondis ────────────────────────
-          // Détecter si chaque coin de la face est arrondi
-          let pos: [number, number, number] = [0, 0, 0];
-          let rot: [number, number, number] = [0, 0, 0];
-
-          switch (face) {
-            case 'front': {
-              // Face Z+ : latéral = X, profondeur = Z
-              // Coins : frontLeft (X-), frontRight (X+)
-              const crNeg = radii.frontLeft > 0.01;
-              const crPos = radii.frontRight > 0.01;
-              const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
-              pos = [offsetX, offsetY, surfaceZ + 0.003];
-              rot = [0, rotY, 0];
-              break;
-            }
-            case 'back': {
-              // Face Z- : latéral = X (inversé), profondeur = -Z
-              // Coins : backLeft (X-), backRight (X+)
-              const crNeg = radii.backLeft > 0.01;
-              const crPos = radii.backRight > 0.01;
-              const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
-              pos = [offsetX, offsetY, -(surfaceZ + 0.003)];
-              rot = [0, Math.PI - rotY, 0];
-              break;
-            }
-            case 'left': {
-              // Face X- : latéral = Z, profondeur = -X
-              // Coins : backLeft (Z-), frontLeft (Z+)
-              const crNeg = radii.backLeft > 0.01;
-              const crPos = radii.frontLeft > 0.01;
-              const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
-              pos = [-(surfaceZ + 0.003), offsetY, offsetX];
-              rot = [0, Math.PI / 2 + rotY, 0];
-              break;
-            }
-            case 'right': {
-              // Face X+ : latéral = Z, profondeur = X
-              // Coins : backRight (Z-), frontRight (Z+)
-              const crNeg = radii.backRight > 0.01;
-              const crPos = radii.frontRight > 0.01;
-              const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
-              pos = [surfaceZ + 0.003, offsetY, offsetX];
-              rot = [0, -(Math.PI / 2 + rotY), 0];
-              break;
-            }
-          }
-
-          stones.push(
-            <mesh
-              key={`stone-${face}-${i}`}
-              name={`stonePatch-${face}-${i}`}
-              position={pos}
-              rotation={rot}
-              castShadow
-              receiveShadow
-            >
-              <RoundedBox args={[w, h, 0.012]} radius={0.004} smoothness={2}>
-                <meshStandardMaterial color={patchColor} roughness={0.95} />
-              </RoundedBox>
-            </mesh>
-          );
-        }
-      }
-    });
-
-    return <>{stones}</>;
-  };
 
   const renderBaseTrim = () => {
     // Vérifier si nous devons supprimer toutes les plinthes

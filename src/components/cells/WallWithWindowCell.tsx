@@ -5,13 +5,13 @@ import {
   getExposedFaces, 
   getCornerRadii, 
   hasOccupiedCell,
-  projectOnFace,
   FLAT_LIMIT,
   EDGE_R 
 } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
 import { WINDOW_PROTECTED_AREAS, isInProtectedArea, TOWER_EXTERNAL_RADIUS, DECO_BAND_RADIUS } from '../../config/protectedAreasConfig';
+import { renderStonePatches as renderStonePatchesShared } from '../../utils/stonePatches';
 
 interface WallWithWindowCellProps {
   cell: GridCell;
@@ -90,182 +90,64 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   };
 
   // ── Pierres apparentes (toujours présentes sauf sur les toits) ─────────────────
+  // 🔢 Pour changer facilement le nombre de pierres par face : remplacer
+  // `undefined` par un nombre fixe (ex: 5) ou une fonction (cell, faceIdx) => n.
+  // `undefined` conserve le comportement d'origine (3 à 5 pierres selon seed).
+  const STONES_PER_FACE: number | undefined = 10;
+
   const renderStonePatches = (hasBands: boolean, renderContext: 'tower' | 'wall' = 'wall') => {
     if (exposedFaces.length === 0) return null;
 
-    const stones: any[] = [];
     const stoneColor = varyColorBrightness(baseColor, -0.25);
 
-    // Utiliser la configuration centralisée des zones protégées
-    const PROTECTED_AREAS = WINDOW_PROTECTED_AREAS;
-
-    /**
-     * Vérifie si une position (x, y) sur une face est dans une zone protégée
-     * Utilise la fonction centralisée isInProtectedArea
-     */
-    const isInProtectedZone = (
-      face: string,
-      x: number,
-      y: number,
-      stoneWidth: number,
-      stoneHeight: number
-    ): boolean => {
-      // Déterminer quel élément est sur cette face
-      let area = PROTECTED_AREAS.window; // par défaut
-      if (face === doorFace) {
-        area = PROTECTED_AREAS.door;
-      } else if (isIsolated) {
-        area = PROTECTED_AREAS.arrowSlit;
-      }
-      
-      // Vérifier l'élément principal (fenêtre, porte, meurtrière)
-      if (isInProtectedArea(area, x, y, stoneWidth, stoneHeight)) {
-        return true;
-      }
-      
-      // Vérifier les decorative bands (toujours présentes)
-      if (isInProtectedArea(PROTECTED_AREAS.bandTop, x, y, stoneWidth, stoneHeight)) {
-        return true;
-      }
-      if (isInProtectedArea(PROTECTED_AREAS.bandBottom, x, y, stoneWidth, stoneHeight)) {
-        return true;
-      }
-      
-      return false;
-    };
-
-    // Taille de base des pierres
+    // Taille de base des pierres (dépend de la cellule)
     const baseStoneW = 0.12 + (Math.abs(cell.x) % 4) * 0.02;
     const baseStoneH = baseStoneW * 0.75;
 
-    // Rayon d'arrondi des pierres : proportionnel à la hauteur de la pierre
-    // Même valeur pour tours et murs plats
-    const stoneRadius = 0.012;
-
-    // Nombre de pierres par face (3-5)
-    const stonesPerFace = 3 + (Math.abs(cell.x * 3 + cell.z * 7) % 3);
-
-    exposedFaces.forEach((face, faceIdx) => {
-      for (let i = 0; i < stonesPerFace; i++) {
-        const seed = Math.abs(cell.x * 7 + cell.y * 11 + cell.z * 13 + faceIdx * 23 + i * 17);
-        const h1 = seed % 100;
-        const h2 = (seed * 7 + 13) % 100;
-        const h3 = (seed * 3 + 41) % 100;
-
-        const sizeVar = 0.85 + (h1 % 20) / 100;
-        const w = baseStoneW * sizeVar;
-        const h = baseStoneH * (0.8 + (h2 % 15) / 100);
-
-        // Répartir dans les 4 quadrants pour éviter le centre
-        const quadrant = i % 4;
-        const signX = (quadrant === 0 || quadrant === 2) ? -1 : 1;
-        const signY = (quadrant === 0 || quadrant === 1) ? -1 : 1;
-
-        // Distance minimale pour éviter le centre
-        const minDist = 0.20;
-        const distX = minDist + (h1 % 18) * 0.01;
-        const distY = 0.18 + (h2 % 16) * 0.01;
-        const offsetX = signX * distX;
-        const offsetY = signY * distY;
-
-        // Vérifier si cette pierre est dans une zone protégée
-        // (fenêtre, porte ou meurtrière selon le contexte)
-        if (isInProtectedZone(face, offsetX, offsetY, w, h)) {
-          continue; // Sauter cette pierre
+    return renderStonePatchesShared({
+      cell,
+      exposedFaces,
+      isIsolated,
+      radii,
+      // Les murs avec fenêtre utilisent l'amplitude réelle du radius
+      // (projection plus fine que le simple flag booléen).
+      cornerMode: 'numeric',
+      towerRadius: towerStoneRadius,
+      wallSurfaceOffset: 0.015, // place les pierres au-dessus des decorative bands
+      stonesPerFace: STONES_PER_FACE,
+      seedSalt: { x: 7, y: 11, z: 13, face: 23, stone: 17 },
+      baseSize: { width: baseStoneW, height: baseStoneH },
+      computeSize: (h1, h2, _h3, base) => ({
+        width: base.width * (0.85 + (h1 % 20) / 100),
+        height: base.height * (0.8 + (h2 % 15) / 100),
+      }),
+      distance: { xBase: 0.2, xModRange: 18, yBase: 0.18, yModRange: 16 },
+      visual: {
+        thickness: 0.025,
+        cornerRadius: 0.012,
+        smoothness: 4,
+        color: stoneColor,
+        roughness: 0.85,
+        metalness: 0.1,
+        metalnessIsolated: 0.05,
+      },
+      // 🔒 Zone protégée propre à WallWithWindowCell (fenêtre / porte /
+      // meurtrière + bandes décoratives). Ne jamais réutiliser celle de
+      // StandardCell : les éléments protégés ne sont pas les mêmes.
+      isInProtectedZone: (face, x, y, w, h) => {
+        let area = WINDOW_PROTECTED_AREAS.window; // par défaut
+        if (face === doorFace) {
+          area = WINDOW_PROTECTED_AREAS.door;
+        } else if (isIsolated) {
+          area = WINDOW_PROTECTED_AREAS.arrowSlit;
         }
 
-        if (isIsolated) {
-          // ── Tour cylindrique : projection de offsetX sur la surface du cylindre ─
-          // Même logique que les murs plats : offsetX est la position latérale
-          // sur la face, projetée sur le cercle via asin(t/r).
-          const faceAngles: Record<string, number> = {
-            front: 0, back: Math.PI, right: Math.PI / 2, left: -Math.PI / 2,
-          };
-          const baseFaceAngle = faceAngles[face] ?? 0;
-
-          // Signe selon la face pour cohérence directionnelle
-          const lateralSign = (face === 'back' || face === 'right') ? -1 : 1;
-
-          // Les pierres sont placées sur le cylindre externe (TOWER_EXTERNAL_RADIUS)
-          // pour être au-dessus des decorative bands (DECO_BAND_RADIUS)
-          const safeT = Math.max(-towerStoneRadius * 0.95, Math.min(towerStoneRadius * 0.95, offsetX));
-          const angle = baseFaceAngle + lateralSign * Math.asin(safeT / towerStoneRadius);
-
-          const posX = Math.sin(angle) * towerStoneRadius;
-          const posZ = Math.cos(angle) * towerStoneRadius;
-          const rotY = angle;
-
-          stones.push(
-            <mesh
-              key={`stone-${faceIdx}-${i}`}
-              name={`stonePatch-${faceIdx}-${i}`}
-              position={[posX, offsetY, posZ]}
-              rotation={[0, rotY, 0]}
-              castShadow
-              receiveShadow
-            >
-              <RoundedBox args={[w, h, 0.025]} radius={stoneRadius} smoothness={4}>
-                <meshStandardMaterial color={stoneColor} roughness={0.85} metalness={0.05} />
-              </RoundedBox>
-            </mesh>
-          );
-        } else {
-          // ── Mur avec coins éventuellement arrondis ────────────────────────
-          // Offset radial pour placer les pierres au-dessus des decorative bands
-          // Decorative band radius = 0.505, pierre épaisseur = 0.025 (demi = 0.0125)
-          // Pour éviter la superposition : 0.5 + offset + 0.0125 > 0.505
-          // → offset > 0.505 - 0.5 - 0.0125 = 0.0025
-          // Avec une marge de sécurité, utilisons offset = 0.015
-          const stoneOffset = 0.015; // Décalage vers l'extérieur
-          let pos: [number, number, number] = [0, 0, 0];
-          let rot: [number, number, number] = [0, 0, 0];
-
-          switch (face) {
-            case 'front': {
-              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.frontLeft, radii.frontRight);
-              pos = [offsetX, offsetY, surfaceZ + stoneOffset];
-              rot = [0, rotY, 0];
-              break;
-            }
-            case 'back': {
-              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft, radii.backRight);
-              pos = [offsetX, offsetY, -(surfaceZ + stoneOffset)];
-              rot = [0, Math.PI - rotY, 0];
-              break;
-            }
-            case 'left': {
-              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backLeft, radii.frontLeft);
-              pos = [-(surfaceZ + stoneOffset), offsetY, offsetX];
-              rot = [0, Math.PI / 2 + rotY, 0];
-              break;
-            }
-            case 'right': {
-              const { surfaceZ, rotY } = projectOnFace(offsetX, radii.backRight, radii.frontRight);
-              pos = [surfaceZ + stoneOffset, offsetY, offsetX];
-              rot = [0, -(Math.PI / 2 + rotY), 0];
-              break;
-            }
-          }
-
-          stones.push(
-            <mesh
-              key={`stone-${faceIdx}-${i}`}
-              name={`stonePatch-${faceIdx}-${i}`}
-              position={pos}
-              rotation={rot}
-              castShadow
-              receiveShadow
-            >
-              <RoundedBox args={[w, h, 0.025]} radius={stoneRadius} smoothness={4}>
-                <meshStandardMaterial color={stoneColor} roughness={0.85} metalness={0.1} />
-              </RoundedBox>
-            </mesh>
-          );
-        }
-      }
+        if (isInProtectedArea(area, x, y, w, h)) return true;
+        if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandTop, x, y, w, h)) return true;
+        if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandBottom, x, y, w, h)) return true;
+        return false;
+      },
     });
-
-    return <>{stones}</>;
   };
 
 
