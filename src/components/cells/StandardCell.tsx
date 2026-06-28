@@ -11,6 +11,7 @@ import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
 import { STANDARD_PROTECTED_AREAS, checkInProtectedZones } from '../../config/protectedAreasConfig';
 import { renderStonePatches as renderStonePatchesShared } from '../../utils/stonePatches';
+import { renderQuoins, isQuoinProtected } from '../../utils/cornerDecorations';
 
 interface StandardCellProps {
   cell: GridCell;
@@ -63,77 +64,15 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
         roughness: 0.95,
       },
       // 🔒 Zone protégée propre à StandardCell (quoins, base trim, etc.)
-      isInProtectedZone: (face, x, y, w, h) =>
-        checkInProtectedZones(STANDARD_PROTECTED_AREAS, x, y, w, h),
+      isInProtectedZone: (face, x, y, w, h) => {
+        if (checkInProtectedZones(STANDARD_PROTECTED_AREAS, x, y, w, h)) return true;
+        if (isQuoinProtected(cell, lookup, isIsolated, face, x, w)) return true;
+        return false;
+      },
     });
   };
 
-  const renderQuoins = () => {
-    // Vérifier si le propertyBundle existe et si nous devons supprimer les quoins
-    if (cell.propertyBundle) {
-      const { mergeFlags } = cell.propertyBundle;
-
-      // Si tous les quoins sont supprimés, ne rien rendre
-      if (mergeFlags.suppressQuoin.backLeft && mergeFlags.suppressQuoin.backRight &&
-          mergeFlags.suppressQuoin.frontLeft && mergeFlags.suppressQuoin.frontRight) {
-        return null;
-      }
-    }
-
-    const corners = [
-      { dx: -1, dz: -1, cornerName: 'backLeft' as const },
-      { dx: 1, dz: -1, cornerName: 'frontRight' as const },
-      { dx: -1, dz: 1, cornerName: 'frontLeft' as const },
-      { dx: 1, dz: 1, cornerName: 'backRight' as const },
-    ];
-
-    return corners.map(({ dx, dz, cornerName }, i) => {
-      // Vérifier si ce quoin spécifique est supprimé
-      if (cell.propertyBundle?.mergeFlags.suppressQuoin[cornerName]) {
-        return null;
-      }
-
-      // Un coin est exposé si au moins un des côtés adjacents n'est pas occupé
-      const adj1 = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z);
-      const adj2 = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + dz);
-      const diag = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z + dz);
-      const isExposed = !(adj1 && adj2 && diag);
-
-      if (!isExposed) return null;
-
-      // Niveau 0 (bas) et Niveau 2 (haut) - longs le long de X
-      const w1_x = 0.16;
-      const w1_z = 0.08;
-      const posX1 = dx * (0.5 - w1_x / 2);
-      const posZ1 = dz * (0.5 - w1_z / 2);
-
-      // Niveau 1 (milieu) - long le long de Z
-      const w2_x = 0.08;
-      const w2_z = 0.16;
-      const posX2 = dx * (0.5 - w2_x / 2);
-      const posZ2 = dz * (0.5 - w2_z / 2);
-
-      return (
-        <group key={`quoin-${i}`}>
-          <mesh name="quoinL0" position={[posX1, -0.32, posZ1]} castShadow receiveShadow>
-            <RoundedBox args={[w1_x, 0.18, w1_z]} radius={0.01} smoothness={2}>
-              <meshStandardMaterial color={quoinColor} roughness={0.9} />
-            </RoundedBox>
-          </mesh>
-          <mesh name="quoinL1" position={[posX2, 0.0, posZ2]} castShadow receiveShadow>
-            <RoundedBox args={[w2_x, 0.18, w2_z]} radius={0.01} smoothness={2}>
-              <meshStandardMaterial color={quoinColor} roughness={0.9} />
-            </RoundedBox>
-          </mesh>
-          <mesh name="quoinL2" position={[posX1, 0.32, posZ1]} castShadow receiveShadow>
-            <RoundedBox args={[w1_x, 0.18, w1_z]} radius={0.01} smoothness={2}>
-              <meshStandardMaterial color={quoinColor} roughness={0.9} />
-            </RoundedBox>
-          </mesh>
-        </group>
-      );
-    });
-  };
+  const renderQuoinsElement = () => renderQuoins({ cell, lookup, isIsolated, baseColor, radii });
 
 
 
@@ -244,7 +183,7 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       />
       
       {/* Détails de murs et fondations : pierres d'angle, maçonnerie apparente et plinthes */}
-      {renderQuoins()}
+      {renderQuoinsElement()}
       {renderStonePatches()}
       {!isFoundation && renderBaseTrim()}
 

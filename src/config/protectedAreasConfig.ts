@@ -119,10 +119,6 @@ export const WINDOW_PROTECTED_AREAS: ProtectedAreasConfig = {
  * Protège les quoins (coins), la base trim et les decorative bands contre les superpositions avec les stone patches
  */
 export const STANDARD_PROTECTED_AREAS: ProtectedAreasConfig = {
-  // Zones des coins : protège une zone carrée autour de chaque coin
-  // Les quoins sont à environ (±0.42, ±0.46) avec taille 0.16×0.18
-  // Marge de 0.12 permet d'éviter les superpositions
-  corner: { marginX: 0.12, marginY: 0.12 },
   
   // Zone de la base trim : bande horizontale en bas à y = -0.46
   // Hauteur de la base trim : 0.08

@@ -12,6 +12,7 @@ import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
 import { WINDOW_PROTECTED_AREAS, isInProtectedArea, TOWER_EXTERNAL_RADIUS, DECO_BAND_RADIUS } from '../../config/protectedAreasConfig';
 import { renderStonePatches as renderStonePatchesShared } from '../../utils/stonePatches';
+import { renderQuoins, isQuoinProtected } from '../../utils/cornerDecorations';
 
 interface WallWithWindowCellProps {
   cell: GridCell;
@@ -38,15 +39,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   // Utilisation de la constante centralisée TOWER_EXTERNAL_RADIUS
   const towerStoneRadius = TOWER_EXTERNAL_RADIUS;
 
-  // Saillie des coins - valeur ajustable pour contrôler combien les coins dépassent du mur
-  // Valeur initiale conservative : 0.005 (dépasse légèrement de la surface à -0.5/0.5)
-  // Pour ajuster : augmenter pour plus de saillie, diminuer pour moins de saillie
-  const CORNER_PROTRUSION = -0.05;
 
-  // Radius des arrondis pour les décorations de coin
-  // Valeur initiale conservative : 0.003 pour des arrondis subtils
-  // Pour ajuster : augmenter pour plus d'arrondi, diminuer pour des coins plus anguleux
-  const CORNER_ROUNDING_RADIUS = 0.001;
 
   // Radius des arrondis pour les éléments principaux (fenêtres, portes)
   // Valeur initiale : 0.015 pour un arrondi visible mais pas trop prononcé
@@ -149,6 +142,9 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandTop, x, y, w, h)) return true;
           if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandBottom, x, y, w, h)) return true;
         }
+
+        // Protection des quoins (partagée)
+        if (isQuoinProtected(cell, lookup, isIsolated, face, x, w)) return true;
         
         return false;
       },
@@ -330,152 +326,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         </mesh>
       );
     }
-    // Pour les coins, ajouter des décorations d'angle
-    else if (isCorner) {
-      // Déterminer quels coins sont exposés
-      const hasTopLeftCorner = !hasLeftNeighbor && !hasBackNeighbor;
-      const hasTopRightCorner = !hasRightNeighbor && !hasBackNeighbor;
-      const hasBottomLeftCorner = !hasLeftNeighbor && !hasFrontNeighbor;
-      const hasBottomRightCorner = !hasRightNeighbor && !hasFrontNeighbor;
-
-      const showTopLeft = hasTopLeftCorner && radii.backLeft <= 0.01;
-      const showTopRight = hasTopRightCorner && radii.backRight <= 0.01;
-      const showBottomLeft = hasBottomLeftCorner && radii.frontLeft <= 0.01;
-      const showBottomRight = hasBottomRightCorner && radii.frontRight <= 0.01;
-
-       if (showTopLeft) {
-         // Coin haut-gauche-arrière - saillie contrôlée par variable ajustable
-         // Utilise CORNER_PROTRUSION pour un contrôle précis de la saillie
-         const cornerPos = -0.5 - CORNER_PROTRUSION;
-         decoElements.push(
-           <mesh key="corner-deco-tl-l0" name="cornerDecoTL-L0" position={[cornerPos, -0.32, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={CORNER_ROUNDING_RADIUS} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-         decoElements.push(
-           <mesh key="corner-deco-tl-l1" name="cornerDecoTL-L1" position={[cornerPos, 0.0, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={CORNER_ROUNDING_RADIUS} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-         decoElements.push(
-           <mesh key="corner-deco-tl-l2" name="cornerDecoTL-L2" position={[cornerPos, 0.32, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={CORNER_ROUNDING_RADIUS} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-       }
-
-       if (showTopRight) {
-         // Coin haut-droit-arrière
-         const cornerPos = 0.5 + CORNER_PROTRUSION;
-         decoElements.push(
-           <mesh key="corner-deco-tr-l0" name="cornerDecoTR-L0" position={[cornerPos, -0.32, -0.5 - CORNER_PROTRUSION]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-         decoElements.push(
-           <mesh key="corner-deco-tr-l1" name="cornerDecoTR-L1" position={[cornerPos, 0.0, -0.5 - CORNER_PROTRUSION]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-         decoElements.push(
-           <mesh key="corner-deco-tr-l2" name="cornerDecoTR-L2" position={[cornerPos, 0.32, -0.5 - CORNER_PROTRUSION]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-       }
-
-       if (showBottomLeft) {
-         // Coin bas-gauche-avant
-         const cornerPos = -0.5 - CORNER_PROTRUSION;
-         decoElements.push(
-           <mesh key="corner-deco-bl-l0" name="cornerDecoBL-L0" position={[cornerPos, -0.32, 0.5 + CORNER_PROTRUSION]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-         decoElements.push(
-           <mesh key="corner-deco-bl-l1" name="cornerDecoBL-L1" position={[cornerPos, 0.0, 0.5 + CORNER_PROTRUSION]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-         decoElements.push(
-           <mesh key="corner-deco-bl-l2" name="cornerDecoBL-L2" position={[cornerPos, 0.32, 0.5 + CORNER_PROTRUSION]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-       }
-
-       if (showBottomRight) {
-         // Coin bas-droit-avant
-         const cornerPos = 0.5 + CORNER_PROTRUSION;
-         decoElements.push(
-           <mesh key="corner-deco-br-l0" name="cornerDecoBR-L0" position={[cornerPos, -0.32, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-         decoElements.push(
-           <mesh key="corner-deco-br-l1" name="cornerDecoBR-L1" position={[cornerPos, 0.0, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-         decoElements.push(
-           <mesh key="corner-deco-br-l2" name="cornerDecoBR-L2" position={[cornerPos, 0.32, cornerPos]} castShadow>
-             <RoundedBox args={[0.14, 0.18, 0.14]} radius={0.01} smoothness={2}>
-               <meshStandardMaterial color={decoColor} roughness={0.9} />
-             </RoundedBox>
-           </mesh>
-         );
-       }
-    }
-    // Pour les murs avec une face exposée, ajouter des décorations latérales
-    else if (exteriorFaceCount === 1) {
-      // Déterminer quelle face est exposée
-      const exposedFace = exteriorFaces[0];
-
-      // Valeurs par défaut
-      let decoPosition: [number, number, number] = [0, 0, 0];
-      let decoRotation: [number, number, number] = [0, 0, 0];
-
-      switch (exposedFace) {
-        case 'left':
-          decoPosition = [-0.505, 0, 0];
-          decoRotation = [0, Math.PI / 2, 0];
-          break;
-        case 'right':
-          decoPosition = [0.505, 0, 0];
-          decoRotation = [0, -Math.PI / 2, 0];
-          break;
-        case 'front':
-          decoPosition = [0, 0, 0.505];
-          decoRotation = [0, 0, 0];
-          break;
-        case 'back':
-          decoPosition = [0, 0, -0.505];
-          decoRotation = [0, Math.PI, 0];
-          break;
-      }
-    }
 
     return <>{decoElements}</>;
   };
@@ -488,6 +338,9 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
       {/* Décorations murales adaptées au contexte du bloc */}
       {renderWallDecorations()}
+      
+      {/* Pierres d'angle (quoins) partagées */}
+      {renderQuoins({ cell, lookup, isIsolated, baseColor, radii })}
 
       {/* Pierres apparentes - toujours présentes sur les murs (sauf toits) */}
       {renderStonePatches(isFullyExposed, 'wall')}
