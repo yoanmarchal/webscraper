@@ -88,7 +88,7 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   // `undefined` conserve le comportement d'origine (3 à 5 pierres selon seed).
   const STONES_PER_FACE = 25; // Plus grand nombre de tentatives pour combler les espaces libres
 
-  const renderStonePatches = (hasBands: boolean, renderContext: 'tower' | 'wall' = 'wall') => {
+  const renderStonePatches = (hasBands: boolean) => {
     if (exposedFaces.length === 0) return null;
 
     const stoneColor = varyColorBrightness(baseColor, -0.25);
@@ -179,13 +179,13 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           </RoundedBox>
         </mesh>
         {/* Séparateur horizontal */}
-        <mesh position={[0, 0, 0.51]} castShadow>
-          <boxGeometry args={[0.56, 0.03, 0.01]} />
+        <mesh name="windowHorizontalSeparator" position={[0, 0, 0.51]} castShadow>
+          <boxGeometry args={[0.54, 0.05, 0.01]} />
           <meshStandardMaterial color={varyColorBrightness(windowFrameColor, -0.05)} roughness={0.88} />
         </mesh>
         {/* Séparateur vertical */}
-        <mesh position={[0, 0, 0.51]} castShadow>
-          <boxGeometry args={[0.03, 0.46, 0.01]} />
+        <mesh name="windowVerticalSeparator" position={[0, 0, 0.51]} castShadow>
+          <boxGeometry args={[0.03, 0.44, 0.01]} />
           <meshStandardMaterial color={varyColorBrightness(windowFrameColor, -0.05)} roughness={0.88} />
         </mesh>
       </group>
@@ -253,99 +253,36 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   };
 
   // ── Helper : rendu d'une face ──────────────────────────────────────────
-  const renderFace = (face: string, index: number, towerMode: boolean) => {
+  const renderFace = (face: string, index: number) => {
     if (face === doorFace) {
       return createSimpleDoor(rotMap[face], `door-${index}`);
     }
     const rot = rotMap[face];
-    if (towerMode) return createSimpleArrowSlit(rot, index);
+    // Les tours (4 faces exposées) utilisent des meurtrières, les murs des fenêtres
+    if (isIsolated) return createSimpleArrowSlit(rot, index);
     return createSimpleWindow(rot, index);
   };
 
-   // ── RENDU TOUR ISOLÉE ──────────────────────────────────────────────────
-   if (isIsolated) {
-     // Pour les tours, utiliser le même radius que le corps principal (0.5 pour un bloc 1x1x1)
-     // Le ShapedBox avec isIsolated=true crée un cylindre de radius w/2 = 0.5
-     const towerBodyRadius = 0.5; // Correspond au radius du cylindre principal
-     const towerDecoSegments = 32; // Plus de segments pour un meilleur arrondi
+  // ── Bandes décoratives adaptées à la courbure ──────────────────────────
+  const decoColor = varyColorBrightness(baseColor, -0.2);
+  const hasBands = isExteriorWall;
 
-     return (
-       <group name="wallWithWindowCell" position={position}>
-         <ShapedBox args={[1.0, 1.0, 1.0]} radii={radii} isIsolated={true}
-           color={cell.color ?? '#d0baa0'} roughness={0.94} castShadow receiveShadow />
-
-         {/* Décorations murales : bandes légèrement au-dessus du corps, sous les pierres */}
-         <mesh name="decorativeBandTop" position={[0, 0.35, 0]} castShadow>
-           <cylinderGeometry args={[DECO_BAND_RADIUS, DECO_BAND_RADIUS, 0.08, towerDecoSegments]} />
-           <meshStandardMaterial 
-             color={varyColorBrightness(baseColor, -0.2)} 
-             roughness={0.7} 
-             metalness={0.1}
-           />
-         </mesh>
-         <mesh name="decorativeBandBottom" position={[0, -0.35, 0]} castShadow>
-           <cylinderGeometry args={[DECO_BAND_RADIUS, DECO_BAND_RADIUS, 0.08, towerDecoSegments]} />
-           <meshStandardMaterial 
-             color={varyColorBrightness(baseColor, -0.2)} 
-             roughness={0.7} 
-             metalness={0.1}
-           />
-         </mesh>
-
-        {/* Pierres apparentes - toujours présentes sur les murs */}
-        {renderStonePatches(true, 'tower')}
-
-        {exposedFaces.map((face, index) => renderFace(face, index, true))}
-      </group>
-    );
-  }
-
-  // ── RENDU MUR STANDARD ────────────────────────────────────────────────
-  // Rendu des décorations murales adaptées au contexte
-  const renderWallDecorations = () => {
-    if (!isExteriorWall) return null; // Pas de décorations pour les murs intérieurs
-
-    // Adapter les décorations en fonction du contexte
-    const decoColor = varyColorBrightness(baseColor, -0.15);
-    const decoElements = [];
-
-    // Pour les murs complètement exposés (piliers), utiliser des bandes comme les tours
-    if (isFullyExposed) {
-      // Pour les piliers complètement exposés, utiliser le même radius que le corps principal
-      // Le ShapedBox avec isIsolated=false mais tous les coins arrondis devrait avoir un radius effectif proche de 0.5
-      const wallDecoSegments = 32; // Plus de segments pour un meilleur arrondi
-
-      decoElements.push(
-        <mesh key="deco-band-top" name="decorativeBandTop" position={[0, 0.35, 0]} castShadow>
-          <cylinderGeometry args={[DECO_BAND_RADIUS, DECO_BAND_RADIUS, 0.08, wallDecoSegments]} />
-          <meshStandardMaterial color={varyColorBrightness(baseColor, -0.2)} roughness={0.7} metalness={0.1} />
-        </mesh>,
-        <mesh key="deco-band-bottom" name="decorativeBandBottom" position={[0, -0.35, 0]} castShadow>
-          <cylinderGeometry args={[DECO_BAND_RADIUS, DECO_BAND_RADIUS, 0.08, wallDecoSegments]} />
-          <meshStandardMaterial color={varyColorBrightness(baseColor, -0.2)} roughness={0.7} metalness={0.1} />
-        </mesh>
-      );
-    }
-
-    return <>{decoElements}</>;
-  };
-
+  // ── RENDU UNIFIÉ ──────────────────────────────────────────────────────
+  // La forme est pilotée par `radii` : coins exposés → arrondi,
+  // coins joints → angle droit. Plus de chemin séparé tour/mur.
   return (
     <group name="wallWithWindowCell" position={position}>
-      <ShapedBox args={[1.0, 1.0, 1.0]} radii={radii} isIsolated={false}
+      <ShapedBox args={[1.0, 1.0, 1.0]} radii={radii} isIsolated={isIsolated}
         color={cell.color ?? '#e0c996'} roughness={0.94} castShadow receiveShadow
         edgeRadius={MAIN_BLOCK_EDGE_RADIUS} />
-
-      {/* Décorations murales adaptées au contexte du bloc */}
-      {renderWallDecorations()}
       
       {/* Pierres d'angle (quoins) partagées */}
       {renderQuoins({ cell, lookup, isIsolated, baseColor, radii })}
 
       {/* Pierres apparentes - toujours présentes sur les murs (sauf toits) */}
-      {renderStonePatches(isFullyExposed, 'wall')}
+      {renderStonePatches(hasBands)}
 
-      {exposedFaces.map((face, index) => renderFace(face, index, false))}
+      {exposedFaces.map((face, index) => renderFace(face, index))}
     </group>
   );
 }

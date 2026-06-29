@@ -226,78 +226,50 @@ export function renderStonePatches(config: StonePatchesConfig) {
 
       const key = `stone-${face}-${faceIdx}-${i}`;
 
-      if (isIsolated) {
-        // ── Tour cylindrique : projection de offsetX sur la surface ──────
-        const baseFaceAngle = FACE_ANGLES[face] ?? 0;
-        const lateralSign = face === 'back' || face === 'right' ? -1 : 1;
-        const safeT = Math.max(-towerRadius * 0.95, Math.min(towerRadius * 0.95, offsetX));
-        const angle = baseFaceAngle + lateralSign * Math.asin(safeT / towerRadius);
-        const posX = Math.sin(angle) * towerRadius;
-        const posZ = Math.cos(angle) * towerRadius;
+      // ── Projection sur la surface réelle (mur plat ou arrondi) ────────
+      // Utilise projectOnFace avec les radii réels pour épouser la courbure
+      const [crNeg, crPos] = getFaceCorners(face, radii, cornerMode);
+      let pos: [number, number, number] = [0, 0, 0];
+      let rot: [number, number, number] = [0, 0, 0];
 
-        stones.push(
-          <mesh
-            key={key}
-            name={`stonePatch-${face}-${i}`}
-            position={[posX, offsetY, posZ]}
-            rotation={[0, angle, 0]}
-            castShadow
-            receiveShadow
-          >
-            <RoundedBox args={[w, h, visual.thickness]} radius={visual.cornerRadius} smoothness={visual.smoothness ?? 2}>
-              <meshStandardMaterial
-                color={visual.color}
-                roughness={visual.roughness ?? 0.9}
-                metalness={visual.metalnessIsolated ?? visual.metalness ?? 0}
-              />
-            </RoundedBox>
-          </mesh>
-        );
-      } else {
-        // ── Mur avec coins éventuellement arrondis ────────────────────────
-        const [crNeg, crPos] = getFaceCorners(face, radii, cornerMode);
-        let pos: [number, number, number] = [0, 0, 0];
-        let rot: [number, number, number] = [0, 0, 0];
-
-        switch (face) {
-          case 'front': {
-            const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
-            pos = [offsetX, offsetY, surfaceZ + wallSurfaceOffset];
-            rot = [0, rotY, 0];
-            break;
-          }
-          case 'back': {
-            const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
-            pos = [offsetX, offsetY, -(surfaceZ + wallSurfaceOffset)];
-            rot = [0, Math.PI - rotY, 0];
-            break;
-          }
-          case 'left': {
-            const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
-            pos = [-(surfaceZ + wallSurfaceOffset), offsetY, offsetX];
-            rot = [0, Math.PI / 2 + rotY, 0];
-            break;
-          }
-          case 'right': {
-            const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
-            pos = [surfaceZ + wallSurfaceOffset, offsetY, offsetX];
-            rot = [0, -(Math.PI / 2 + rotY), 0];
-            break;
-          }
+      switch (face) {
+        case 'front': {
+          const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
+          pos = [offsetX, offsetY, surfaceZ + wallSurfaceOffset];
+          rot = [0, rotY, 0];
+          break;
         }
-
-        stones.push(
-          <mesh key={key} name={`stonePatch-${face}-${i}`} position={pos} rotation={rot} castShadow receiveShadow>
-            <RoundedBox args={[w, h, visual.thickness]} radius={visual.cornerRadius} smoothness={visual.smoothness ?? 2}>
-              <meshStandardMaterial
-                color={visual.color}
-                roughness={visual.roughness ?? 0.9}
-                metalness={visual.metalness ?? 0}
-              />
-            </RoundedBox>
-          </mesh>
-        );
+        case 'back': {
+          const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
+          pos = [offsetX, offsetY, -(surfaceZ + wallSurfaceOffset)];
+          rot = [0, Math.PI - rotY, 0];
+          break;
+        }
+        case 'left': {
+          const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
+          pos = [-(surfaceZ + wallSurfaceOffset), offsetY, offsetX];
+          rot = [0, Math.PI / 2 + rotY, 0];
+          break;
+        }
+        case 'right': {
+          const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
+          pos = [surfaceZ + wallSurfaceOffset, offsetY, offsetX];
+          rot = [0, -(Math.PI / 2 + rotY), 0];
+          break;
+        }
       }
+
+      stones.push(
+        <mesh key={key} name={`stonePatch-${face}-${i}`} position={pos} rotation={rot} castShadow receiveShadow>
+          <RoundedBox args={[w, h, visual.thickness]} radius={visual.cornerRadius} smoothness={visual.smoothness ?? 2}>
+            <meshStandardMaterial
+              color={visual.color}
+              roughness={visual.roughness ?? 0.9}
+              metalness={visual.metalness ?? 0}
+            />
+          </RoundedBox>
+        </mesh>
+      );
     }
   });
 

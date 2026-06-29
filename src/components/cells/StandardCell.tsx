@@ -49,9 +49,8 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       exposedFaces,
       isIsolated,
       radii,
-      // Les murs standards ne raisonnent qu'en "coin arrondi oui/non",
-      // pas en amplitude exacte du radius → mode booléen.
-      cornerMode: 'boolean',
+      // Utilise les radii réels pour que les pierres épousent la courbure
+      cornerMode: 'numeric',
       towerRadius: 0.502,
       wallSurfaceOffset: 0.003,
       stonesPerFace: STONES_PER_FACE,
@@ -125,58 +124,17 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
     });
   };
 
-  // Tour isolée - aspect de tour même pour les murs simples
-  if (isIsolated) {
-        return (
-          <group name="standardCellIsolated" position={position}>
-            {/* Corps principal : cylindre moins rond pour plus de réalisme */}
-            <ShapedBox
-              args={[1.0, 1.0, 1.0]}
-              radii={radii}
-              isIsolated={true}
-              color={baseColor}
-              roughness={0.94}
-              castShadow
-              receiveShadow
-            />
-
-        {/* Éléments décoratifs : bande horizontale avec meilleur arrondi et visibilité */}
-        {!isFoundation && (
-          <mesh name="decorativeBandTop" position={[0, 0.455, 0]}>
-            <RoundedBox args={[1.05, 0.08, 1.05]} radius={0.25} smoothness={8} castShadow>
-              <meshStandardMaterial 
-                color={varyColorBrightness(baseColor, -0.25)} 
-                roughness={0.65} 
-                metalness={0.15}
-              />
-            </RoundedBox>
-          </mesh>
-        )}
-        
-        {/* Fondation renforcée pour tour */}
-        {isFoundation && (
-          <>
-            {/* Base élargie */}
-            <mesh name="foundationBase" position={[0, -0.46, 0]}>
-              <RoundedBox args={[1.12, 0.06, 1.12]} radius={0.02} smoothness={4} castShadow receiveShadow>
-                <meshStandardMaterial color="#7d7a70" roughness={0.96} />
-              </RoundedBox>
-            </mesh>
-          </>
-        )}
-      </group>
-    );
-  }
-
-  // Mur ou fondation standard (non-tour)
+  // ── Rendu unifié (mur, tour, fondation) ────────────────────────────────────
+  // La forme est entièrement pilotée par `radii` : coins exposés → arrondi,
+  // coins joints → angle droit. Plus besoin de séparer isIsolated.
   return (
     <group name="standardCell" position={position}>
-      {/* Corps principal : coins arrondis sur les faces exposées, plats sur les joints */}
+      {/* Corps principal : forme pilotée par radii */}
       <ShapedBox
         args={[1.0, 1.0, 1.0]}
         radii={radii}
-        isIsolated={false}
-        color={cell.color ?? '#b8b8b8'}
+        isIsolated={isIsolated}
+        color={cell.color ?? baseColor}
         roughness={0.94}
         castShadow
         receiveShadow
@@ -188,31 +146,40 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       {!isFoundation && renderBaseTrim()}
 
       {/* Corniche horizontale sur les murs (pas sur les fondations) */}
+      {/* Utilise ShapedBox avec les mêmes radii pour épouser la courbure */}
       {!isFoundation && !cell.propertyBundle?.mergeFlags.suppressCornice && (
         <>
-          <mesh name='cornicheTop' position={[0, 0.46, 0]}>
-            <RoundedBox args={[1.04, 0.06, 1.04]} radius={0.02} smoothness={4} castShadow receiveShadow>
-              <meshStandardMaterial color="#d8c8ae" roughness={0.86} />
-            </RoundedBox>
-          </mesh>
-          <mesh name='corniceMiddle' position={[0, 0.38, 0]}>
-            <RoundedBox args={[1.02, 0.04, 1.02]} radius={0.01} smoothness={4} castShadow>
-              <meshStandardMaterial color="#c8b89e" roughness={0.88} />
-            </RoundedBox>
-          </mesh>
+          <ShapedBox
+            args={[1.04, 0.06, 1.04]}
+            radii={radii}
+            isIsolated={isIsolated}
+            color={'#d8c8ae'}
+            roughness={0.86}
+            castShadow
+            receiveShadow
+          />
+          <ShapedBox
+            args={[1.02, 0.04, 1.02]}
+            radii={radii}
+            isIsolated={isIsolated}
+            color={'#c8b89e'}
+            roughness={0.88}
+            castShadow
+          />
         </>
       )}
       
       {/* Détails de fondation en pierre */}
       {isFoundation && (
-        <>
-          {/* Base élargie de fondation */}
-          <mesh name='foundationBase' position={[0, -0.48, 0]}>
-            <RoundedBox args={[1.08, 0.02, 1.08]} radius={0.01} smoothness={4} castShadow receiveShadow>
-              <meshStandardMaterial color="#7d7a70" roughness={0.96} />
-            </RoundedBox>
-          </mesh>
-        </>
+        <ShapedBox
+          args={[1.08, 0.02, 1.08]}
+          radii={radii}
+          isIsolated={isIsolated}
+          color={'#7d7a70'}
+          roughness={0.96}
+          castShadow
+          receiveShadow
+        />
       )}
     </group>
   );

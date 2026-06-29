@@ -3,6 +3,7 @@ import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { getRoofConfig } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
+import { ShapedBox } from '../ShapedBox';
 
 interface RoofCellProps {
   cell: GridCell;
@@ -96,17 +97,17 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
     return (
       <group name="chimney" position={[sideX, RIDGE_Y - 0.06, 0.06]}>
         {/* Stone body */}
-        <mesh castShadow receiveShadow>
+        <mesh name="chimneyBody" castShadow receiveShadow>
           <boxGeometry args={[0.14, 0.46, 0.14]} />
           <meshStandardMaterial color="#a09080" roughness={0.93} />
         </mesh>
         {/* Stone cap */}
-        <mesh castShadow position={[0, 0.25, 0]}>
+        <mesh name="chimneyCap" castShadow position={[0, 0.25, 0]}>
           <boxGeometry args={[0.19, 0.04, 0.19]} />
           <meshStandardMaterial color="#7a6a5a" roughness={0.91} />
         </mesh>
         {/* Terracotta pot */}
-        <mesh castShadow position={[0, 0.31, 0]}>
+        <mesh name="chimneyPot" castShadow position={[0, 0.31, 0]}>
           <cylinderGeometry args={[0.034, 0.042, 0.09, 8]} />
           <meshStandardMaterial color="#a05a42" roughness={0.82} />
         </mesh>
@@ -143,60 +144,60 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
     return (
       <group name="roofCell" position={position}>
 
-        {/* ── Corps du parapet (cylindre solide) ── */}
-        <mesh castShadow receiveShadow position={[0, PARAPET_MID_Y, 0]}>
-          <cylinderGeometry args={[PARAPET_R, PARAPET_R, PARAPET_H, 24]} />
-          <meshStandardMaterial color={roofColor} roughness={0.90} />
-        </mesh>
+          {/* ── Corps du parapet (cylindre solide) ── */}
+          <mesh name="parapetBody" castShadow receiveShadow position={[0, PARAPET_MID_Y, 0]}>
+            <cylinderGeometry args={[PARAPET_R, PARAPET_R, PARAPET_H, 24]} />
+            <meshStandardMaterial color={roofColor} roughness={0.90} />
+          </mesh>
 
-        {/* ── Bandeau de couronnement ── */}
-        <mesh castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.02, 0]}>
-          <cylinderGeometry args={[PARAPET_R + 0.02, PARAPET_R + 0.02, 0.04, 24]} />
-          <meshStandardMaterial color={colorDark} roughness={0.88} />
-        </mesh>
+          {/* ── Bandeau de couronnement ── */}
+          <mesh name="parapetCrownBand" castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.02, 0]}>
+            <cylinderGeometry args={[PARAPET_R + 0.02, PARAPET_R + 0.02, 0.04, 24]} />
+            <meshStandardMaterial color={colorDark} roughness={0.88} />
+          </mesh>
 
-        {/* ── Merlons ── */}
-        {Array.from({ length: MERLON_COUNT }).map((_, i) => {
-          const angle = (i / MERLON_COUNT) * Math.PI * 2;
-          const mx = Math.cos(angle) * MERLON_RING_R;
-          const mz = Math.sin(angle) * MERLON_RING_R;
-          return (
-            <mesh key={`merlon-${i}`} castShadow receiveShadow position={[mx, MERLON_Y, mz]}>
-              <cylinderGeometry args={[MERLON_R, MERLON_R * 1.1, MERLON_H, 10]} />
-              <meshStandardMaterial color={roofColor} roughness={0.87} />
-            </mesh>
-          );
-        })}
+          {/* ── Merlons ── */}
+          {Array.from({ length: MERLON_COUNT }).map((_, i) => {
+            const angle = (i / MERLON_COUNT) * Math.PI * 2;
+            const mx = Math.cos(angle) * MERLON_RING_R;
+            const mz = Math.sin(angle) * MERLON_RING_R;
+            return (
+              <mesh name={`merlon-${i}`} key={`merlon-${i}`} castShadow receiveShadow position={[mx, MERLON_Y, mz]}>
+                <cylinderGeometry args={[MERLON_R, MERLON_R * 1.1, MERLON_H, 10]} />
+                <meshStandardMaterial color={roofColor} roughness={0.87} />
+              </mesh>
+            );
+          })}
 
-        {/* ── Bague de base de flèche ── */}
-        <mesh castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.09, 0]}>
-          <cylinderGeometry args={[SPIRE_BASE_R + 0.04, SPIRE_BASE_R + 0.08, 0.10, 16]} />
-          <meshStandardMaterial color={colorDark} roughness={0.88} />
-        </mesh>
+          {/* ── Bague de base de flèche ── */}
+          <mesh name="spireBaseRing" castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.09, 0]}>
+            <cylinderGeometry args={[SPIRE_BASE_R + 0.04, SPIRE_BASE_R + 0.08, 0.10, 16]} />
+            <meshStandardMaterial color={colorDark} roughness={0.88} />
+          </mesh>
 
-        {/* ── Flèche conique ── */}
-        <mesh castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.14 + SPIRE_H / 2, 0]}>
-          <coneGeometry args={[SPIRE_BASE_R, SPIRE_H, 16]} />
-          <meshStandardMaterial color={colorDark} roughness={0.82} />
-        </mesh>
+          {/* ── Flèche conique ── */}
+          <mesh name="spireCone" castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.14 + SPIRE_H / 2, 0]}>
+            <coneGeometry args={[SPIRE_BASE_R, SPIRE_H, 16]} />
+            <meshStandardMaterial color={colorDark} roughness={0.82} />
+          </mesh>
 
-        {/* ── Anneaux de tuiles sur la flèche ── */}
-        {[0.18, 0.36, 0.54, 0.72].map((t, i) => {
-          const bandR = SPIRE_BASE_R * (1 - t);
-          const bandY = PARAPET_Y_TOP + 0.14 + t * SPIRE_H;
-          return (
-            <mesh key={`band-${i}`} castShadow position={[0, bandY, 0]}>
-              <cylinderGeometry args={[bandR + 0.015, bandR + 0.015, 0.03, 16]} />
-              <meshStandardMaterial color={roofColor} roughness={0.88} />
-            </mesh>
-          );
-        })}
+          {/* ── Anneaux de tuiles sur la flèche ── */}
+          {[0.18, 0.36, 0.54, 0.72].map((t, i) => {
+            const bandR = SPIRE_BASE_R * (1 - t);
+            const bandY = PARAPET_Y_TOP + 0.14 + t * SPIRE_H;
+            return (
+              <mesh name={`spireBand-${i}`} key={`band-${i}`} castShadow position={[0, bandY, 0]}>
+                <cylinderGeometry args={[bandR + 0.015, bandR + 0.015, 0.03, 16]} />
+                <meshStandardMaterial color={roofColor} roughness={0.88} />
+              </mesh>
+            );
+          })}
 
-        {/* ── Épis doré ── */}
-        <mesh castShadow position={[0, PARAPET_Y_TOP + 0.14 + SPIRE_H + 0.06, 0]}>
-          <sphereGeometry args={[0.06, 12, 12]} />
-          <meshStandardMaterial color="#d4a04f" metalness={0.75} roughness={0.15} />
-        </mesh>
+          {/* ── Épis doré ── */}
+          <mesh name="spireFinial" castShadow position={[0, PARAPET_Y_TOP + 0.14 + SPIRE_H + 0.06, 0]}>
+            <sphereGeometry args={[0.06, 12, 12]} />
+            <meshStandardMaterial color="#d4a04f" metalness={0.75} roughness={0.15} />
+          </mesh>
 
       </group>
     );
@@ -223,17 +224,16 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
 
   return (
     <group name="roofCell" position={position} rotation={[0, yRot, 0]}>
-
       {/* ── Right slope panel (slopes down toward +X) ── */}
-      <group position={[RUN / 2, CENTER_Y, 0]} rotation={[0, 0, -SLOPE_ANG]}>
+      <group name="rightSlopePanel" position={[RUN / 2, CENTER_Y, 0]} rotation={[0, 0, -SLOPE_ANG]}>
         {/* Main panel surface */}
-        <mesh castShadow receiveShadow>
+        <mesh name="rightSlopePanelSurface" castShadow receiveShadow>
           <boxGeometry args={[SLOPE_LEN, PANEL_T, PANEL_LEN]} />
           <meshStandardMaterial color={roofColor} roughness={0.84} />
         </mesh>
         {/* Horizontal tile rib lines */}
         {RIB_OFFSETS.map((z, i) => (
-          <mesh key={i} castShadow position={[0, PANEL_T / 2 + 0.012, z]}>
+          <mesh key={i} name={`rightSlopePanelRib-${i}`} castShadow position={[0, PANEL_T / 2 + 0.012, z]}>
             <boxGeometry args={[SLOPE_LEN, 0.022, 0.042]} />
             <meshStandardMaterial color={colorDark} roughness={0.92} />
           </mesh>
@@ -241,15 +241,15 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
       </group>
 
       {/* ── Left slope panel (slopes down toward −X) ── */}
-      <group position={[-RUN / 2, CENTER_Y, 0]} rotation={[0, 0, SLOPE_ANG]}>
+      <group name="leftSlopePanel" position={[-RUN / 2, CENTER_Y, 0]} rotation={[0, 0, SLOPE_ANG]}>
         {/* Main panel surface */}
-        <mesh castShadow receiveShadow>
+        <mesh name="leftSlopePanelSurface" castShadow receiveShadow>
           <boxGeometry args={[SLOPE_LEN, PANEL_T, PANEL_LEN]} />
           <meshStandardMaterial color={colorLight} roughness={0.84} />
         </mesh>
         {/* Horizontal tile rib lines */}
         {RIB_OFFSETS.map((z, i) => (
-          <mesh key={i} castShadow position={[0, PANEL_T / 2 + 0.012, z]}>
+          <mesh key={i} name={`leftSlopePanelRib-${i}`} castShadow position={[0, PANEL_T / 2 + 0.012, z]}>
             <boxGeometry args={[SLOPE_LEN, 0.022, 0.042]} />
             <meshStandardMaterial color={colorDark} roughness={0.92} />
           </mesh>
@@ -257,33 +257,33 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
       </group>
 
       {/* ── Ridge cap ── */}
-      <mesh castShadow receiveShadow position={[0, RIDGE_Y + 0.028, 0]}>
+      <mesh name="ridgeCap" castShadow receiveShadow position={[0, RIDGE_Y + 0.028, 0]}>
         <boxGeometry args={[0.14, 0.056, PANEL_LEN + 0.02]} />
         <meshStandardMaterial color={colorDark} roughness={0.89} />
       </mesh>
 
       {/* ── Ridge end caps (rounded knobs) ── */}
       {needGablePos && (
-        <mesh castShadow position={[0, RIDGE_Y + 0.028, PANEL_LEN / 2 + 0.01]}>
+        <mesh name="ridgeEndCapPos" castShadow position={[0, RIDGE_Y + 0.028, PANEL_LEN / 2 + 0.01]}>
           <boxGeometry args={[0.14, 0.056, 0.06]} />
           <meshStandardMaterial color={colorDark} roughness={0.89} />
         </mesh>
       )}
       {needGableNeg && (
-        <mesh castShadow position={[0, RIDGE_Y + 0.028, -(PANEL_LEN / 2 + 0.01)]}>
+        <mesh name="ridgeEndCapNeg" castShadow position={[0, RIDGE_Y + 0.028, -(PANEL_LEN / 2 + 0.01)]}>
           <boxGeometry args={[0.14, 0.056, 0.06]} />
           <meshStandardMaterial color={colorDark} roughness={0.89} />
         </mesh>
       )}
 
       {/* ── Right eave board (fascia) ── */}
-      <mesh castShadow receiveShadow position={[0.518, EAVE_Y - 0.020, 0]}>
+      <mesh name="rightEaveBoard" castShadow receiveShadow position={[0.518, EAVE_Y - 0.020, 0]}>
         <boxGeometry args={[0.044, 0.064, PANEL_LEN + 0.06]} />
         <meshStandardMaterial color={colorDark} roughness={0.89} />
       </mesh>
 
       {/* ── Left eave board (fascia) ── */}
-      <mesh castShadow receiveShadow position={[-0.518, EAVE_Y - 0.020, 0]}>
+      <mesh name="leftEaveBoard" castShadow receiveShadow position={[-0.518, EAVE_Y - 0.020, 0]}>
         <boxGeometry args={[0.044, 0.064, PANEL_LEN + 0.06]} />
         <meshStandardMaterial color={colorDark} roughness={0.89} />
       </mesh>
@@ -293,6 +293,7 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
         <>
           {/* Triangular gable fill */}
           <mesh
+
             castShadow
             receiveShadow
             geometry={gableGeo}
@@ -301,16 +302,16 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
             <meshStandardMaterial color={roofColor} roughness={0.88} />
           </mesh>
           {/* Barge boards along gable slope edges */}
-          <mesh castShadow position={[RUN / 2, CENTER_Y, 0.502]} rotation={[0, 0, -SLOPE_ANG]}>
+          <mesh name="bargeBoardPosPos" castShadow position={[RUN / 2, CENTER_Y, 0.502]} rotation={[0, 0, -SLOPE_ANG]}>
             <boxGeometry args={[SLOPE_LEN, 0.04, 0.05]} />
             <meshStandardMaterial color={colorDark} roughness={0.91} />
           </mesh>
-          <mesh castShadow position={[-RUN / 2, CENTER_Y, 0.502]} rotation={[0, 0, SLOPE_ANG]}>
+          <mesh name="bargeBoardPosNeg" castShadow position={[-RUN / 2, CENTER_Y, 0.502]} rotation={[0, 0, SLOPE_ANG]}>
             <boxGeometry args={[SLOPE_LEN, 0.04, 0.05]} />
             <meshStandardMaterial color={colorDark} roughness={0.91} />
           </mesh>
           {/* Gable bottom board */}
-          <mesh castShadow receiveShadow position={[0, EAVE_Y - 0.020, 0.502]}>
+          <mesh name="gablePosBottomBoard" castShadow receiveShadow position={[0, EAVE_Y - 0.020, 0.502]}>
             <boxGeometry args={[1.06, 0.064, 0.044]} />
             <meshStandardMaterial color={colorDark} roughness={0.89} />
           </mesh>
@@ -321,26 +322,20 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
       {needGableNeg && (
         <>
           {/* Triangular gable fill */}
-          <mesh
-            castShadow
-            receiveShadow
-            geometry={gableGeo}
-            position={[0, 0, -0.466]}
-            rotation={[0, Math.PI, 0]}
-          >
+          <mesh name="gableNegFill" castShadow receiveShadow geometry={gableGeo} position={[0, 0, -0.466]} rotation={[0, Math.PI, 0]}>
             <meshStandardMaterial color={roofColor} roughness={0.88} />
           </mesh>
           {/* Barge boards */}
-          <mesh castShadow position={[RUN / 2, CENTER_Y, -0.502]} rotation={[0, 0, -SLOPE_ANG]}>
+          <mesh name="bargeBoardNegPos" castShadow position={[RUN / 2, CENTER_Y, -0.502]} rotation={[0, 0, -SLOPE_ANG]}>
             <boxGeometry args={[SLOPE_LEN, 0.04, 0.05]} />
             <meshStandardMaterial color={colorDark} roughness={0.91} />
           </mesh>
-          <mesh castShadow position={[-RUN / 2, CENTER_Y, -0.502]} rotation={[0, 0, SLOPE_ANG]}>
+          <mesh name="bargeBoardNegNeg" castShadow position={[-RUN / 2, CENTER_Y, -0.502]} rotation={[0, 0, SLOPE_ANG]}>
             <boxGeometry args={[SLOPE_LEN, 0.04, 0.05]} />
             <meshStandardMaterial color={colorDark} roughness={0.91} />
           </mesh>
           {/* Gable bottom board */}
-          <mesh castShadow receiveShadow position={[0, EAVE_Y - 0.020, -0.502]}>
+          <mesh name="gableNegBottomBoard" castShadow receiveShadow position={[0, EAVE_Y - 0.020, -0.502]}>
             <boxGeometry args={[1.06, 0.064, 0.044]} />
             <meshStandardMaterial color={colorDark} roughness={0.89} />
           </mesh>

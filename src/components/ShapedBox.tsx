@@ -1,11 +1,11 @@
 /**
  * ShapedBox – corps principal d'une cellule avec héritage de forme.
  *
- * ISOLÉ   → cylindre plein (section circulaire, vraie tour ronde)
- * GROUPÉ  → boîte à faces PLATES dont chaque arête verticale est arrondie
- *            ou carrée selon qu'elle est exposée ou jointe à un voisin.
+ * Chaque arête verticale est arrondie ou carrée selon les radii fournis.
+ * Les coins exposés (sans voisin) ont un grand radius (tour arrondie),
+ * les coins joints ont un radius nul (angle droit).
  *
- * Implémentation du cas groupé :
+ * Implémentation :
  *   On assemble la section 2D (plan XZ) comme un polygone convexe :
  *   – Pour chaque coin libre  : arc de cercle de radius R (quart de disque)
  *   – Pour chaque coin joint  : angle droit (vertex unique au coin exact)
@@ -19,8 +19,8 @@ import type { CornerRadii } from '../utils/cellUtils';
 
 // Radius utilisé pour les coins libres dans le cas groupé
 const EDGE_R = 0.15;
-// Nombre de segments par arc de coin arrondi
-const ARC_SEGS = 6;
+// Nombre de segments par arc de coin arrondi (10 pour un rendu lisse sur les grands radii)
+const ARC_SEGS = 10;
 
 interface ShapedBoxProps {
   args?: [number, number, number];
@@ -96,7 +96,7 @@ function arcPoints(
 export function ShapedBox({
   args = [1, 1, 1],
   radii,
-  isIsolated,
+  isIsolated: _isIsolated, // conservé pour compatibilité d'interface, non utilisé
   color,
   roughness = 0.92,
   castShadow = true,
@@ -105,20 +105,8 @@ export function ShapedBox({
   edgeRadius = EDGE_R,
 }: ShapedBoxProps) {
   const [w, h, d] = args;
-  const mat = <meshStandardMaterial color={color} roughness={roughness} {...materialProps} />;
 
-  // ── CAS ISOLÉ : cylindre circulaire ──────────────────────────────────────
-  if (isIsolated) {
-    const r = w / 2;
-    return (
-      <mesh castShadow={castShadow} receiveShadow={receiveShadow}>
-        <cylinderGeometry args={[r, r, h, 24]} />
-        {mat}
-      </mesh>
-    );
-  }
-
-  // ── CAS GROUPÉ : extrusion de section polygonale ──────────────────────────
+  // ── Toujours extrusion de section polygonale avec radii par coin ──────────
   return (
     <ExtrudedBlock
       w={w} h={h} d={d}
@@ -169,7 +157,7 @@ function ExtrudedBlock({ w, h, d, radii, color, roughness, castShadow, receiveSh
   }, [w, h, d, radii, edgeRadius]);
 
   return (
-    <mesh geometry={geometry} castShadow={castShadow} receiveShadow={receiveShadow}>
+    <mesh name="shapedBox" geometry={geometry} castShadow={castShadow} receiveShadow={receiveShadow}>
       <meshStandardMaterial color={color} roughness={roughness} {...materialProps} />
     </mesh>
   );
