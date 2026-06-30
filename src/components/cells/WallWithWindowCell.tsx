@@ -1,4 +1,7 @@
+import React, { useMemo } from 'react';
 import { RoundedBox } from '@react-three/drei';
+import { Geometry, Base, Subtraction } from '@react-three/csg';
+import { RoundedBoxGeometry } from 'three-stdlib';
 import type { GridCell, ProtectedAreasConfig } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { 
@@ -35,35 +38,39 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   // Calculer le radius moyen du bloc pour l'utiliser dans tous les éléments
   const avgRadius = (radii.backLeft + radii.backRight + radii.frontLeft + radii.frontRight) / 4;
 
-  // Rayons pour les stone patches sur les tours (doit être déclaré avant renderStonePatches)
-  // Utilisation de la constante centralisée TOWER_EXTERNAL_RADIUS
+  // Pré-calcul des rayons pour la fenêtre
+  const windowRadius = Math.min(0.025, avgRadius * 0.9);
+  const glassRadius = Math.min(0.02, avgRadius * 0.8);
+
+  // ── Géométries CSG mémorisées (optimisation R3F) ──────────────────────
+  const frameOuterGeometry = useMemo(
+    () => new RoundedBoxGeometry(0.6, 0.5, 0.02, 4, windowRadius),
+    [windowRadius]
+  );
+
+  const frameInnerGeometry = useMemo(
+    () => new RoundedBoxGeometry(0.54, 0.44, 0.04, 4, glassRadius),
+    [glassRadius]
+  );
+
+  // Rayons pour les stone patches sur les tours
   const towerStoneRadius = TOWER_EXTERNAL_RADIUS;
 
-
-
-  // Radius des arrondis pour les éléments principaux (fenêtres, portes)
-  // Valeur initiale : 0.015 pour un arrondi visible mais pas trop prononcé
-  // Pour ajuster : augmenter pour plus d'arrondi, diminuer pour des angles plus nets
   const MAIN_ELEMENT_ROUNDING_RADIUS = 0.015;
-
-  // Radius des arrondis pour le bloc principal (ShapedBox)
-  // Valeur initiale : 0.12 pour un arrondi moins prononcé que le défaut (0.18)
-  // Pour ajuster : augmenter pour plus d'arrondi, diminuer pour des coins plus nets
   const MAIN_BLOCK_EDGE_RADIUS = 0.12;
 
-  // Déterminer le contexte du bloc pour adapter les décorations murales
+  // Déterminer le contexte du bloc
   const hasLeftNeighbor = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
   const hasRightNeighbor = hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z);
   const hasFrontNeighbor = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
   const hasBackNeighbor = hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1);
 
-  // Compter le nombre de faces extérieures (non adjacentes à d'autres blocs)
   const exteriorFaces = [
     !hasLeftNeighbor ? 'left' : null,
     !hasRightNeighbor ? 'right' : null,
     !hasFrontNeighbor ? 'front' : null,
     !hasBackNeighbor ? 'back' : null
-  ].filter(face => face !== null);
+  ].filter((face): face is string => face !== null);
 
   const isExteriorWall = exteriorFaces.length > 0;
   const exteriorFaceCount = exteriorFaces.length;
@@ -82,18 +89,13 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     right: Math.PI / 2,
   };
 
-  // ── Pierres apparentes (toujours présentes sauf sur les toits) ─────────────────
-  // 🔢 Pour changer facilement le nombre de pierres par face : remplacer
-  // `undefined` par un nombre fixe (ex: 5) ou une fonction (cell, faceIdx) => n.
-  // `undefined` conserve le comportement d'origine (3 à 5 pierres selon seed).
-  const STONES_PER_FACE = 25; // Plus grand nombre de tentatives pour combler les espaces libres
+  // ── Pierres apparentes ─────────────────────────────────────────────────
+  const STONES_PER_FACE = 25;
 
   const renderStonePatches = (hasBands: boolean) => {
     if (exposedFaces.length === 0) return null;
 
     const stoneColor = varyColorBrightness(baseColor, -0.25);
-
-    // Taille de base des pierres (dépend de la cellule)
     const baseStoneW = 0.12 + (Math.abs(cell.x) % 4) * 0.02;
     const baseStoneH = baseStoneW * 0.75;
 
@@ -102,11 +104,9 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       exposedFaces,
       isIsolated,
       radii,
-      // Les murs avec fenêtre utilisent l'amplitude réelle du radius
-      // (projection plus fine que le simple flag booléen).
       cornerMode: 'numeric',
       towerRadius: towerStoneRadius,
-      wallSurfaceOffset: 0.015, // place les pierres au-dessus des decorative bands
+      wallSurfaceOffset: 0.015,
       stonesPerFace: STONES_PER_FACE,
       seedSalt: { x: 7, y: 11, z: 13, face: 23, stone: 17 },
       baseSize: { width: baseStoneW, height: baseStoneH },
@@ -114,7 +114,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         width: base.width * (0.85 + (h1 % 20) / 100),
         height: base.height * (0.8 + (h2 % 15) / 100),
       }),
-      // On couvre toute la face pour permettre aux pierres de se placer autour de la fenêtre
       distance: { xBase: 0, xModRange: 45, yBase: 0, yModRange: 45 },
       visual: {
         thickness: 0.025,
@@ -125,11 +124,8 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         metalness: 0.1,
         metalnessIsolated: 0.05,
       },
-      // 🔒 Zone protégée propre à WallWithWindowCell (fenêtre / porte /
-      // meurtrière + bandes décoratives). Ne jamais réutiliser celle de
-      // StandardCell : les éléments protégés ne sont pas les mêmes.
       isInProtectedZone: (face, x, y, w, h) => {
-        let area = WINDOW_PROTECTED_AREAS.window; // par défaut
+        let area = WINDOW_PROTECTED_AREAS.window;
         if (face === doorFace) {
           area = WINDOW_PROTECTED_AREAS.door;
         } else if (isIsolated) {
@@ -143,7 +139,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
           if (isInProtectedArea(WINDOW_PROTECTED_AREAS.bandBottom, x, y, w, h)) return true;
         }
 
-        // Protection des quoins (partagée)
         if (isQuoinProtected(cell, lookup, isIsolated, face, x, w)) return true;
         
         return false;
@@ -151,24 +146,22 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     });
   };
 
-
-  // ── Fenêtre simplifiée ─────────────────────────────────────────────────
+  // ── Fenêtre avec géométrie soustraite (CSG) ────────────────────────────
   const createSimpleWindow = (rotation: number, faceId: number) => {
-    // Utiliser le radius moyen du bloc parent pour tous les éléments
-    const windowRadius = Math.min(0.025, avgRadius * 0.9);
-    const glassRadius = Math.min(0.02, avgRadius * 0.8);
-
     return (
       <group name="window" rotation={[0, rotation, 0]} key={`window-${faceId}`}>
-        {/* Cadre de fenêtre adapté à l'arrondi du bloc parent */}
-        <mesh name="windowFrame" position={[0, 0, 0.505]} castShadow receiveShadow>
-          <RoundedBox args={[0.6, 0.5, 0.02]} radius={windowRadius} smoothness={4}>
-            <meshStandardMaterial color={windowFrameColor} roughness={0.85} />
-          </RoundedBox>
+        {/* Cadre de fenêtre creusé via @react-three/csg */}
+        <mesh name="windowFrame" position={[0, 0, 0.50]} castShadow receiveShadow>
+          <Geometry>
+            <Base geometry={frameOuterGeometry} />
+            <Subtraction geometry={frameInnerGeometry} />
+          </Geometry>
+          <meshStandardMaterial color={windowFrameColor} roughness={0.85} />
         </mesh>
+        
         {/* Vitre transparente */}
-        <mesh name="windowGlass" position={[0, 0, 0.495]} castShadow receiveShadow>
-          <RoundedBox args={[0.54, 0.44, 0.01]} radius={glassRadius} smoothness={4}>
+        <mesh name="windowGlass" position={[0, 0, 0.51]} castShadow receiveShadow>
+          <RoundedBox args={[0.54, 0.44, 0.03]} radius={glassRadius} smoothness={4}>
             <meshStandardMaterial
               color={windowGlassColor}
               roughness={0.1}
@@ -178,14 +171,16 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
             />
           </RoundedBox>
         </mesh>
+        
         {/* Séparateur horizontal */}
-        <mesh name="windowHorizontalSeparator" position={[0, 0, 0.51]} castShadow>
-          <boxGeometry args={[0.54, 0.05, 0.01]} />
+        <mesh name="windowHorizontalSeparator" position={[0, 0, 0.52]} castShadow>
+          <boxGeometry args={[0.54, 0.05, 0.019]} />
           <meshStandardMaterial color={varyColorBrightness(windowFrameColor, -0.05)} roughness={0.88} />
         </mesh>
+        
         {/* Séparateur vertical */}
-        <mesh name="windowVerticalSeparator" position={[0, 0, 0.51]} castShadow>
-          <boxGeometry args={[0.03, 0.44, 0.01]} />
+        <mesh name="windowVerticalSeparator" position={[0, 0, 0.52]} castShadow>
+          <boxGeometry args={[0.03, 0.44, 0.019]} />
           <meshStandardMaterial color={varyColorBrightness(windowFrameColor, -0.05)} roughness={0.88} />
         </mesh>
       </group>
@@ -194,31 +189,26 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
   // ── Porte simplifiée ────────────────────────────────────────────────────
   const createSimpleDoor = (rotation: number, key: string) => {
-    // Utiliser le radius du bloc parent pour la porte
     const doorFrameRadius = Math.min(0.015, avgRadius * 0.8);
     const doorPanelRadius = Math.min(0.012, avgRadius * 0.7);
     const thresholdRadius = Math.min(0.01, avgRadius * 0.6);
 
     return (
       <group name="door" rotation={[0, rotation, 0]} key={key}>
-        {/* Encadrement de porte adapté au bloc parent */}
         <mesh name="doorFrame" position={[0, -0.06, 0.502]} castShadow receiveShadow>
           <RoundedBox args={[0.48, 0.8, 0.03]} radius={doorFrameRadius} smoothness={4}>
             <meshStandardMaterial color={doorFrameColor} roughness={0.88} />
           </RoundedBox>
         </mesh>
-        {/* Panneau de porte */}
         <mesh name="doorPanel" position={[0, -0.10, 0.5]} castShadow receiveShadow>
           <RoundedBox args={[0.4, 0.7, 0.04]} radius={doorPanelRadius} smoothness={6}>
             <meshStandardMaterial color={doorColor} roughness={0.92} />
           </RoundedBox>
         </mesh>
-        {/* Poignée de porte */}
         <mesh name="doorHandle" position={[0.16, -0.14, 0.502]} rotation={[Math.PI / 2, 0, 0]} castShadow>
           <cylinderGeometry args={[0.01, 0.01, 0.04, 8]} />
           <meshStandardMaterial color="#8a6a3a" metalness={0.55} roughness={0.35} />
         </mesh>
-        {/* Seuil de porte */}
         <mesh name="doorThreshold" position={[0, -0.49, 0.501]} castShadow receiveShadow>
           <RoundedBox args={[0.5, 0.04, 0.03]} radius={thresholdRadius} smoothness={4}>
             <meshStandardMaterial color={varyColorBrightness(baseColor, -0.18)} roughness={0.94} />
@@ -230,19 +220,16 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
   // ── Meurtrière simplifiée (sans volets) ───────────────────────────────
   const createSimpleArrowSlit = (rotation: number, faceId: number) => {
-    // Utiliser le radius du bloc parent pour les meurtrières
     const arrowSlitRadius = Math.min(0.02, avgRadius * 0.9);
     const arrowSlitInnerRadius = Math.min(0.015, avgRadius * 0.7);
 
     return (
       <group name="arrowSlit" rotation={[0, rotation, 0]} key={`arrowslit-${faceId}`}>
-        {/* Ouverture de meurtrière adaptée au bloc parent */}
         <mesh name="arrowSlitMain" position={[0, 0, 0.505]} castShadow receiveShadow>
           <RoundedBox args={[0.14, 0.4, 0.02]} radius={arrowSlitRadius} smoothness={4}>
             <meshStandardMaterial color="#3a2a1a" roughness={0.95} />
           </RoundedBox>
         </mesh>
-        {/* Intérieur de meurtrière */}
         <mesh name="arrowSlitInner" position={[0, 0, 0.49]} castShadow receiveShadow>
           <RoundedBox args={[0.08, 0.32, 0.04]} radius={arrowSlitInnerRadius} smoothness={4}>
             <meshStandardMaterial color="#0a0a0a" roughness={0.98} />
@@ -258,30 +245,22 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
       return createSimpleDoor(rotMap[face], `door-${index}`);
     }
     const rot = rotMap[face];
-    // Les tours (4 faces exposées) utilisent des meurtrières, les murs des fenêtres
     if (isIsolated) return createSimpleArrowSlit(rot, index);
     return createSimpleWindow(rot, index);
   };
 
-  // ── Bandes décoratives adaptées à la courbure ──────────────────────────
   const decoColor = varyColorBrightness(baseColor, -0.2);
   const hasBands = isExteriorWall;
 
   // ── RENDU UNIFIÉ ──────────────────────────────────────────────────────
-  // La forme est pilotée par `radii` : coins exposés → arrondi,
-  // coins joints → angle droit. Plus de chemin séparé tour/mur.
   return (
     <group name="wallWithWindowCell" position={position}>
       <ShapedBox args={[1.0, 1.0, 1.0]} radii={radii} isIsolated={isIsolated}
         color={cell.color ?? '#e0c996'} roughness={0.94} castShadow receiveShadow
         edgeRadius={MAIN_BLOCK_EDGE_RADIUS} />
       
-      {/* Pierres d'angle (quoins) partagées */}
       {renderQuoins({ cell, lookup, isIsolated, baseColor, radii })}
-
-      {/* Pierres apparentes - toujours présentes sur les murs (sauf toits) */}
       {renderStonePatches(hasBands)}
-
       {exposedFaces.map((face, index) => renderFace(face, index))}
     </group>
   );
