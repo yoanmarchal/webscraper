@@ -3,7 +3,6 @@ import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { getArchAxis, getCornerRadii } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
-import { ShapedBox } from '../ShapedBox';
 
 interface ArchCellProps {
   cell: GridCell;

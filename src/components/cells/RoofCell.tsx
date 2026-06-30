@@ -3,7 +3,6 @@ import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { getRoofConfig } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
-import { ShapedBox } from '../ShapedBox';
 
 interface RoofCellProps {
   cell: GridCell;

@@ -55,8 +55,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
   // Rayons pour les stone patches sur les tours
   const towerStoneRadius = TOWER_EXTERNAL_RADIUS;
-
-  const MAIN_ELEMENT_ROUNDING_RADIUS = 0.015;
   const MAIN_BLOCK_EDGE_RADIUS = 0.12;
 
   // Déterminer le contexte du bloc
@@ -75,7 +73,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   const isExteriorWall = exteriorFaces.length > 0;
   const exteriorFaceCount = exteriorFaces.length;
   const isFullyExposed = exteriorFaceCount === 4;
-  const isCorner = exteriorFaceCount >= 2 && !isFullyExposed;
 
   // ── Porte au rez-de-chaussée uniquement ────────────────────────────────
   const isGroundFloor = cell.y === 0;
@@ -249,7 +246,6 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
     return createSimpleWindow(rot, index);
   };
 
-  const decoColor = varyColorBrightness(baseColor, -0.2);
   const hasBands = isExteriorWall;
 
   // ── RENDU UNIFIÉ ──────────────────────────────────────────────────────

@@ -1,11 +1,9 @@
 import { RoundedBox } from '@react-three/drei';
-import type { GridCell, ProtectedAreasConfig } from '../../types';
+import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { 
-  hasOccupiedCell, 
   getExposedFaces, 
   getCornerRadii,
-  FLAT_LIMIT 
 } from '../../utils/cellUtils';
 import { varyColorBrightness } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
@@ -23,8 +21,6 @@ interface StandardCellProps {
 export function StandardCell({ cell, position, lookup, isIsolated }: StandardCellProps) {
   const isFoundation = cell.type === 'FOUNDATION';
   const baseColor = cell.color ?? (isFoundation ? '#8d8a80' : '#c0b0a0');
-
-  const quoinColor = varyColorBrightness(baseColor, -0.12);
   const patchColor = varyColorBrightness(baseColor, -0.15);
   const trimColor = varyColorBrightness(baseColor, -0.08);
 
@@ -72,8 +68,6 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   };
 
   const renderQuoinsElement = () => renderQuoins({ cell, lookup, isIsolated, baseColor, radii });
-
-
 
   const renderBaseTrim = () => {
     // Vérifier si nous devons supprimer toutes les plinthes
@@ -145,29 +139,7 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
       {renderStonePatches()}
       {!isFoundation && renderBaseTrim()}
 
-      {/* Corniche horizontale sur les murs (pas sur les fondations) */}
-      {/* Utilise ShapedBox avec les mêmes radii pour épouser la courbure */}
-      {!isFoundation && !cell.propertyBundle?.mergeFlags.suppressCornice && (
-        <>
-          <ShapedBox
-            args={[1.04, 0.06, 1.04]}
-            radii={radii}
-            isIsolated={isIsolated}
-            color={'#d8c8ae'}
-            roughness={0.86}
-            castShadow
-            receiveShadow
-          />
-          <ShapedBox
-            args={[1.02, 0.04, 1.02]}
-            radii={radii}
-            isIsolated={isIsolated}
-            color={'#c8b89e'}
-            roughness={0.88}
-            castShadow
-          />
-        </>
-      )}
+
       
       {/* Détails de fondation en pierre */}
       {isFoundation && (
