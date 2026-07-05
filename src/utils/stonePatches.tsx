@@ -1,5 +1,6 @@
 import { RoundedBox } from '@react-three/drei';
 import { projectOnFace } from './cellUtils';
+import { JSX } from 'react/jsx-runtime';
 
 export type CellFace = 'front' | 'back' | 'left' | 'right';
 
