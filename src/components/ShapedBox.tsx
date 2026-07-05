@@ -17,8 +17,6 @@ import * as THREE from 'three';
 import { useMemo } from 'react';
 import type { CornerRadii } from '../utils/cellUtils';
 
-// Radius utilisé pour les coins libres dans le cas groupé
-const EDGE_R = 0.15;
 // Nombre de segments par arc de coin arrondi (10 pour un rendu lisse sur les grands radii)
 const ARC_SEGS = 10;
 
@@ -31,7 +29,6 @@ interface ShapedBoxProps {
   castShadow?: boolean;
   receiveShadow?: boolean;
   materialProps?: Record<string, unknown>;
-  edgeRadius?: number; // Radius personnalisé pour les arrondis des coins
 }
 
 /**
@@ -43,7 +40,6 @@ function buildSection(
   hw: number,  // demi-largeur  (X)
   hd: number,  // demi-profondeur (Z → Y dans le plan Shape)
   radii: CornerRadii,
-  edgeRadius: number = EDGE_R,
 ): THREE.Shape {
   // Coins dans l'ordre anti-horaire (vue du dessus, Y positif vers haut de l'écran)
   const corners: Array<{
@@ -102,7 +98,6 @@ export function ShapedBox({
   castShadow = true,
   receiveShadow = true,
   materialProps = {},
-  edgeRadius = EDGE_R,
 }: ShapedBoxProps) {
   const [w, h, d] = args;
 
@@ -116,7 +111,6 @@ export function ShapedBox({
       castShadow={castShadow}
       receiveShadow={receiveShadow}
       materialProps={materialProps}
-      edgeRadius={edgeRadius}
     />
   );
 }
@@ -129,14 +123,13 @@ interface ExtrudedBlockProps {
   castShadow: boolean;
   receiveShadow: boolean;
   materialProps: Record<string, unknown>;
-  edgeRadius: number;
 }
 
-function ExtrudedBlock({ w, h, d, radii, color, roughness, castShadow, receiveShadow, materialProps, edgeRadius }: ExtrudedBlockProps) {
+function ExtrudedBlock({ w, h, d, radii, color, roughness, castShadow, receiveShadow, materialProps }: ExtrudedBlockProps) {
   const geometry = useMemo(() => {
     const hw = w / 2;
     const hd = d / 2;
-  const shape = buildSection(hw, hd, radii, edgeRadius);
+  const shape = buildSection(hw, hd, radii);
 
     const geo = new THREE.ExtrudeGeometry(shape, {
       depth: h,
@@ -154,7 +147,7 @@ function ExtrudedBlock({ w, h, d, radii, color, roughness, castShadow, receiveSh
 
     geo.computeVertexNormals();
     return geo;
-  }, [w, h, d, radii, edgeRadius]);
+  }, [w, h, d, radii]);
 
   return (
     <mesh name="shapedBox" geometry={geometry} castShadow={castShadow} receiveShadow={receiveShadow}>

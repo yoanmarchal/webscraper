@@ -2,20 +2,18 @@ import React, { useMemo } from 'react';
 import { RoundedBox } from '@react-three/drei';
 import { Geometry, Base, Subtraction } from '@react-three/csg';
 import { RoundedBoxGeometry } from 'three-stdlib';
-import type { GridCell, ProtectedAreasConfig } from '../../types';
-import type { CellLookup } from '../../utils/cellUtils';
+import type { GridCell } from '../../types';
+import type { CellLookup, CellFace } from '../../utils/cellUtils';
 import { 
   getExposedFaces, 
   getCornerRadii, 
-  hasOccupiedCell,
-  FLAT_LIMIT,
-  EDGE_R 
+  FACE_ROTATION_Y,
 } from '../../utils/cellUtils';
-import { varyColorBrightness } from '../../colorPalettes';
-import { ShapedBox } from '../ShapedBox';
-import { WINDOW_PROTECTED_AREAS, isInProtectedArea, TOWER_EXTERNAL_RADIUS, DECO_BAND_RADIUS } from '../../config/protectedAreasConfig';
+import { varyColorBrightness, shades } from '../../colorPalettes';
+import { CellShell } from './CellShell';
+import { WINDOW_PROTECTED_AREAS, isInProtectedArea, TOWER_EXTERNAL_RADIUS } from '../../config/protectedAreasConfig';
 import { renderStonePatches as renderStonePatchesShared } from '../../utils/stonePatches';
-import { renderQuoins, isQuoinProtected } from '../../utils/cornerDecorations';
+import { isQuoinProtected } from '../../utils/cornerDecorations';
 
 interface WallWithWindowCellProps {
   cell: GridCell;
@@ -28,10 +26,9 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   const exposedFaces = getExposedFaces(lookup, cell);
 
   const baseColor = cell.color ?? '#e0c996';
-  const windowFrameColor = varyColorBrightness(baseColor, -0.15);
   const windowGlassColor = '#2a3a4a';
-  const doorColor = varyColorBrightness(baseColor, -0.20);
-  const doorFrameColor = varyColorBrightness(baseColor, -0.15);
+  const { windowFrameColor, doorColor } = shades(baseColor, { windowFrameColor: -0.15, doorColor: -0.20 });
+  const doorFrameColor = windowFrameColor; // même teinte que le cadre de fenêtre
 
   const radii = getCornerRadii(lookup, cell);
 
@@ -55,36 +52,11 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
 
   // Rayons pour les stone patches sur les tours
   const towerStoneRadius = TOWER_EXTERNAL_RADIUS;
-  const MAIN_BLOCK_EDGE_RADIUS = 0.12;
-
-  // Déterminer le contexte du bloc
-  const hasLeftNeighbor = hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z);
-  const hasRightNeighbor = hasOccupiedCell(lookup, cell.x + 1, cell.y, cell.z);
-  const hasFrontNeighbor = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1);
-  const hasBackNeighbor = hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1);
-
-  const exteriorFaces = [
-    !hasLeftNeighbor ? 'left' : null,
-    !hasRightNeighbor ? 'right' : null,
-    !hasFrontNeighbor ? 'front' : null,
-    !hasBackNeighbor ? 'back' : null
-  ].filter((face): face is string => face !== null);
-
-  const isExteriorWall = exteriorFaces.length > 0;
-  const exteriorFaceCount = exteriorFaces.length;
-  const isFullyExposed = exteriorFaceCount === 4;
 
   // ── Porte au rez-de-chaussée uniquement ────────────────────────────────
   const isGroundFloor = cell.y === 0;
   const doorFaceHash = Math.abs(cell.x * 31 + cell.z * 17) % Math.max(exposedFaces.length, 1);
   const doorFace = isGroundFloor && exposedFaces.length > 0 ? exposedFaces[doorFaceHash] : null;
-
-  const rotMap: Record<string, number> = {
-    front: 0,
-    back: Math.PI,
-    left: -Math.PI / 2,
-    right: Math.PI / 2,
-  };
 
   // ── Pierres apparentes ─────────────────────────────────────────────────
   const STONES_PER_FACE = 25;
@@ -172,13 +144,13 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
         {/* Séparateur horizontal */}
         <mesh name="windowHorizontalSeparator" position={[0, 0, 0.52]} castShadow>
           <boxGeometry args={[0.54, 0.05, 0.019]} />
-          <meshStandardMaterial color={varyColorBrightness(windowFrameColor, -0.05)} roughness={0.88} />
+          <meshStandardMaterial color={varyColorBrightness(windowFrameColor, -0.05)} roughness={1} />
         </mesh>
         
         {/* Séparateur vertical */}
         <mesh name="windowVerticalSeparator" position={[0, 0, 0.52]} castShadow>
           <boxGeometry args={[0.03, 0.44, 0.019]} />
-          <meshStandardMaterial color={varyColorBrightness(windowFrameColor, -0.05)} roughness={0.88} />
+          <meshStandardMaterial color={varyColorBrightness(windowFrameColor, -0.05)} roughness={1} />
         </mesh>
       </group>
     );
@@ -237,27 +209,23 @@ export function WallWithWindowCell({ cell, position, lookup, isIsolated }: WallW
   };
 
   // ── Helper : rendu d'une face ──────────────────────────────────────────
-  const renderFace = (face: string, index: number) => {
+  const renderFace = (face: CellFace, index: number) => {
     if (face === doorFace) {
-      return createSimpleDoor(rotMap[face], `door-${index}`);
+      return createSimpleDoor(FACE_ROTATION_Y[face], `door-${index}`);
     }
-    const rot = rotMap[face];
+    const rot = FACE_ROTATION_Y[face];
     if (isIsolated) return createSimpleArrowSlit(rot, index);
     return createSimpleWindow(rot, index);
   };
 
-  const hasBands = isExteriorWall;
+  const hasBands = exposedFaces.length > 0;
 
   // ── RENDU UNIFIÉ ──────────────────────────────────────────────────────
   return (
-    <group name="wallWithWindowCell" position={position}>
-      <ShapedBox args={[1.0, 1.0, 1.0]} radii={radii} isIsolated={isIsolated}
-        color={cell.color ?? '#e0c996'} roughness={0.94} castShadow receiveShadow
-        edgeRadius={MAIN_BLOCK_EDGE_RADIUS} />
-      
-      {renderQuoins({ cell, lookup, isIsolated, baseColor, radii })}
+    <CellShell name="wallWithWindowCell" cell={cell} position={position} lookup={lookup}
+      isIsolated={isIsolated} baseColor={baseColor} radii={radii}>
       {renderStonePatches(hasBands)}
       {exposedFaces.map((face, index) => renderFace(face, index))}
-    </group>
+    </CellShell>
   );
 }

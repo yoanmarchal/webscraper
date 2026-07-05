@@ -4,12 +4,14 @@ import type { CellLookup } from '../../utils/cellUtils';
 import { 
   getExposedFaces, 
   getCornerRadii,
+  FACE_ROTATION_Y,
 } from '../../utils/cellUtils';
-import { varyColorBrightness } from '../../colorPalettes';
+import { shades } from '../../colorPalettes';
 import { ShapedBox } from '../ShapedBox';
+import { CellShell } from './CellShell';
 import { STANDARD_PROTECTED_AREAS, checkInProtectedZones } from '../../config/protectedAreasConfig';
 import { renderStonePatches as renderStonePatchesShared } from '../../utils/stonePatches';
-import { renderQuoins, isQuoinProtected } from '../../utils/cornerDecorations';
+import { isQuoinProtected } from '../../utils/cornerDecorations';
 
 interface StandardCellProps {
   cell: GridCell;
@@ -21,8 +23,7 @@ interface StandardCellProps {
 export function StandardCell({ cell, position, lookup, isIsolated }: StandardCellProps) {
   const isFoundation = cell.type === 'FOUNDATION';
   const baseColor = cell.color ?? (isFoundation ? '#8d8a80' : '#c0b0a0');
-  const patchColor = varyColorBrightness(baseColor, -0.15);
-  const trimColor = varyColorBrightness(baseColor, -0.08);
+  const { patchColor, trimColor } = shades(baseColor, { patchColor: -0.15, trimColor: -0.08 });
 
   // ── Shape inheritance: corner radii driven by neighbours ──────────────────
   const radii = getCornerRadii(lookup, cell);
@@ -67,8 +68,6 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
     });
   };
 
-  const renderQuoinsElement = () => renderQuoins({ cell, lookup, isIsolated, baseColor, radii });
-
   const renderBaseTrim = () => {
     // Vérifier si nous devons supprimer toutes les plinthes
     if (cell.propertyBundle) {
@@ -86,34 +85,14 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
         return null;
       }
 
-      let rotation: [number, number, number] = [0, 0, 0];
-      let position: [number, number, number] = [0, -0.46, 0];
-
-      switch (face) {
-        case 'front':
-          position = [0, -0.46, 0.505];
-          rotation = [0, 0, 0];
-          break;
-        case 'back':
-          position = [0, -0.46, -0.505];
-          rotation = [0, Math.PI, 0];
-          break;
-        case 'left':
-          position = [-0.505, -0.46, 0];
-          rotation = [0, Math.PI / 2, 0];
-          break;
-        case 'right':
-          position = [0.505, -0.46, 0];
-          rotation = [0, -Math.PI / 2, 0];
-          break;
-      }
-
       return (
-        <mesh key={`trim-${index}`} name="baseTrim" position={position} rotation={rotation} castShadow receiveShadow>
-          <RoundedBox args={[1.02, 0.08, 0.02]} radius={0.01} smoothness={2}>
-            <meshStandardMaterial color={trimColor} roughness={0.9} />
-          </RoundedBox>
-        </mesh>
+        <group key={`trim-${index}`} rotation={[0, FACE_ROTATION_Y[face], 0]}>
+          <mesh name="baseTrim" position={[0, -0.46, 0.505]} castShadow receiveShadow>
+            <RoundedBox args={[1.02, 0.08, 0.02]} radius={0.01} smoothness={2}>
+              <meshStandardMaterial color={trimColor} roughness={0.9} />
+            </RoundedBox>
+          </mesh>
+        </group>
       );
     });
   };
@@ -122,25 +101,12 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
   // La forme est entièrement pilotée par `radii` : coins exposés → arrondi,
   // coins joints → angle droit. Plus besoin de séparer isIsolated.
   return (
-    <group name="standardCell" position={position}>
-      {/* Corps principal : forme pilotée par radii */}
-      <ShapedBox
-        args={[1.0, 1.0, 1.0]}
-        radii={radii}
-        isIsolated={isIsolated}
-        color={cell.color ?? baseColor}
-        roughness={0.94}
-        castShadow
-        receiveShadow
-      />
-      
-      {/* Détails de murs et fondations : pierres d'angle, maçonnerie apparente et plinthes */}
-      {renderQuoinsElement()}
+    <CellShell name="standardCell" cell={cell} position={position} lookup={lookup}
+      isIsolated={isIsolated} baseColor={baseColor} radii={radii}>
+      {/* Détails de murs et fondations : maçonnerie apparente et plinthes */}
       {renderStonePatches()}
       {!isFoundation && renderBaseTrim()}
 
-
-      
       {/* Détails de fondation en pierre */}
       {isFoundation && (
         <ShapedBox
@@ -153,7 +119,7 @@ export function StandardCell({ cell, position, lookup, isIsolated }: StandardCel
           receiveShadow
         />
       )}
-    </group>
+    </CellShell>
   );
 }
 

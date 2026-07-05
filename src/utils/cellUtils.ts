@@ -136,9 +136,24 @@ export function getArchAxis(lookup: CellLookup, cell: GridCell): 'x' | 'z' {
   return 'z';
 }
 
+export type CellFace = 'front' | 'back' | 'left' | 'right';
+
+/**
+ * Rotation Y (radians) à appliquer à un groupe dont le design local fait
+ * face à +Z, pour qu'il pointe vers l'extérieur de la face donnée.
+ * Mapping partagé par tous les cell components qui placent des éléments
+ * (fenêtres, portes, plinthes...) par face.
+ */
+export const FACE_ROTATION_Y: Record<CellFace, number> = {
+  front: 0,
+  back: Math.PI,
+  left: -Math.PI / 2,
+  right: Math.PI / 2,
+};
+
 // Détecte les faces exposées d'un bloc (sans voisin adjacent)
-export function getExposedFaces(lookup: CellLookup, cell: GridCell): Array<'front' | 'back' | 'left' | 'right'> {
-  const faces: Array<'front' | 'back' | 'left' | 'right'> = [];
+export function getExposedFaces(lookup: CellLookup, cell: GridCell): Array<CellFace> {
+  const faces: Array<CellFace> = [];
 
   if (!hasOccupiedCell(lookup, cell.x, cell.y, cell.z + 1)) faces.push('front');  // Z+
   if (!hasOccupiedCell(lookup, cell.x, cell.y, cell.z - 1)) faces.push('back');   // Z-

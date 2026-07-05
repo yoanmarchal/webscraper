@@ -125,13 +125,6 @@ function getFaceCorners(
   }
 }
 
-const FACE_ANGLES: Record<CellFace, number> = {
-  front: 0,
-  back: Math.PI,
-  right: Math.PI / 2,
-  left: -Math.PI / 2,
-};
-
 /**
  * Génère les pierres apparentes (decoration STONE) communes à StandardCell
  * et WallWithWindowCell, pour une tour cylindrique isolée ou un mur plat.

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
 import { getRoofConfig } from '../../utils/cellUtils';
-import { varyColorBrightness } from '../../colorPalettes';
+import { shades } from '../../colorPalettes';
 
 interface RoofCellProps {
   cell: GridCell;
@@ -83,8 +83,7 @@ const getGableGeo = () => {
 export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) {
   const roofConfig = getRoofConfig(lookup, cell);
   const roofColor  = cell.color ?? '#c85a3f';
-  const colorDark  = varyColorBrightness(roofColor, -0.18);
-  const colorLight = varyColorBrightness(roofColor, 0.07);
+  const { colorDark, colorLight } = shades(roofColor, { colorDark: -0.18, colorLight: 0.07 });
 
   // Rib Z offsets in panel-local space (4 tile rows along the ridge direction)
   const RIB_OFFSETS: number[] = [-0.40, -0.13, 0.13, 0.40];

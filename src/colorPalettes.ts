@@ -107,6 +107,22 @@ export function varyColorBrightness(color: string, variation: number): string {
 }
 
 /**
+ * Génère un jeu de teintes dérivées d'une couleur de base en une seule fois.
+ * Remplace les appels répétés `varyColorBrightness(base, x)` par un seul
+ * objet nommé, ex: `const { dark, light } = shades(baseColor, { dark: -0.15, light: 0.07 });`
+ */
+export function shades<T extends Record<string, number>>(
+  base: string,
+  deltas: T
+): Record<keyof T, string> {
+  const result = {} as Record<keyof T, string>;
+  for (const key in deltas) {
+    result[key] = varyColorBrightness(base, deltas[key]);
+  }
+  return result;
+}
+
+/**
  * Génère une variation aléatoire légère d'une couleur
  * @param color Couleur hex (#RRGGBB)
  * @param maxVariation Variation maximale (0.05 = 5%)
