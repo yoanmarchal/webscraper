@@ -29,7 +29,9 @@ export interface CornerRadii {
 }
 
 // Constantes d'ajustement pour les radius des murs
-export const ISOLATED_WALL_RADIUS = 0.40;             // Murs sans aucun voisin (tours) - très arrondi
+// 🔢 C'est LE paramètre à modifier pour ajuster la rondeur des tours : plus
+// la valeur est basse, plus les pans plats sont visibles (moins "cylindre").
+export const ISOLATED_WALL_RADIUS = 0.22;             // Murs sans aucun voisin (tours) - arrondi mais jamais circulaire
 export const CONNECTED_WALL_EXPOSED_RADIUS = 0.1;     // Coins exposés des murs avec 1+ voisins - parfaitement carré
 export const CONNECTED_WALL_INTERIOR_RADIUS = 0.0;    // Coins connectés - parfaitement carré
 
@@ -69,6 +71,23 @@ export function getCornerRadii(lookup: CellLookup, cell: GridCell): CornerRadii 
   const uniform = backLeft === backRight && backRight === frontLeft && frontLeft === frontRight;
 
   return { backLeft, backRight, frontLeft, frontRight, max, uniform };
+}
+
+/**
+ * Multiplie chaque radius de coin par un facteur, en conservant `uniform`.
+ * Sert à faire épouser à un élément plus large ou plus étroit que la
+ * cellule (parapet, bagues, tranches de flèche...) exactement le même
+ * contour proportionnel que le corps principal (ex: `ShapedBox`).
+ */
+export function scaleCornerRadii(radii: CornerRadii, factor: number): CornerRadii {
+  return {
+    backLeft: radii.backLeft * factor,
+    backRight: radii.backRight * factor,
+    frontLeft: radii.frontLeft * factor,
+    frontRight: radii.frontRight * factor,
+    max: radii.max * factor,
+    uniform: radii.uniform,
+  };
 }
 
 export function cellKey(x: number, y: number, z: number): string {
@@ -241,4 +260,77 @@ export function projectOnFace(
     }
   }
   return { surfaceZ: 0.5, rotY: 0 };
+}
+
+/**
+ * Génère les points 2D (plan XZ, X→X / Z→Y) du contour "carré aux coins
+ * arrondis" utilisé par `ShapedBox`. Mutualisé ici pour que d'autres
+ * éléments (parapets de tour, flèches...) puissent épouser exactement le
+ * même contour proportionnel que le corps de la cellule en dessous, au
+ * lieu de recourir à un cercle parfait.
+ */
+export function getRoundedRectContourPoints(
+  hw: number,
+  hd: number,
+  radii: CornerRadii,
+  arcSegs: number = 10,
+): Array<[number, number]> {
+  const corners: Array<{
+    cx: number; cy: number; r: number; startAngle: number; cornerX: number; cornerY: number;
+  }> = [
+    { cx: -hw + radii.frontLeft, cy: -hd + radii.frontLeft, r: radii.frontLeft, startAngle: Math.PI, cornerX: -hw, cornerY: -hd },
+    { cx:  hw - radii.frontRight, cy: -hd + radii.frontRight, r: radii.frontRight, startAngle: Math.PI * 1.5, cornerX: hw, cornerY: -hd },
+    { cx:  hw - radii.backRight, cy:  hd - radii.backRight, r: radii.backRight, startAngle: 0, cornerX: hw, cornerY: hd },
+    { cx: -hw + radii.backLeft, cy:  hd - radii.backLeft, r: radii.backLeft, startAngle: Math.PI * 0.5, cornerX: -hw, cornerY: hd },
+  ];
+
+  const points: Array<[number, number]> = [];
+  for (const c of corners) {
+    if (c.r > 0.001) {
+      for (let i = 0; i <= arcSegs; i++) {
+        const a = c.startAngle + (Math.PI / 2) * (i / arcSegs);
+        points.push([c.cx + Math.cos(a) * c.r, c.cy + Math.sin(a) * c.r]);
+      }
+    } else {
+      points.push([c.cornerX, c.cornerY]);
+    }
+  }
+  return points;
+}
+
+/**
+ * Échantillonne un point sur le périmètre d'un contour fermé (issu de
+ * `getRoundedRectContourPoints`) à une fraction `t` (0..1, cyclique) de la
+ * longueur totale. Retourne aussi l'angle radial (utile pour orienter un
+ * élément vers l'extérieur, ex: un merlon).
+ */
+export function sampleContourPerimeter(
+  points: Array<[number, number]>,
+  t: number,
+): { x: number; z: number; angle: number } {
+  const n = points.length;
+  const segLengths: number[] = [];
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    const [x0, y0] = points[i];
+    const [x1, y1] = points[(i + 1) % n];
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    segLengths.push(len);
+    total += len;
+  }
+
+  let target = (((t % 1) + 1) % 1) * total;
+  for (let i = 0; i < n; i++) {
+    if (target <= segLengths[i] || i === n - 1) {
+      const ratio = segLengths[i] > 0 ? target / segLengths[i] : 0;
+      const [x0, y0] = points[i];
+      const [x1, y1] = points[(i + 1) % n];
+      const x = x0 + (x1 - x0) * ratio;
+      const z = y0 + (y1 - y0) * ratio;
+      return { x, z, angle: Math.atan2(z, x) };
+    }
+    target -= segLengths[i];
+  }
+  const [x, y] = points[0];
+  return { x, z: y, angle: Math.atan2(y, x) };
 }

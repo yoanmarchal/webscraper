@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { useMemo } from 'react';
 import type { CornerRadii } from '../utils/cellUtils';
+import { getRoundedRectContourPoints } from '../utils/cellUtils';
 
 // Nombre de segments par arc de coin arrondi (10 pour un rendu lisse sur les grands radii)
 const ARC_SEGS = 10;
@@ -32,7 +33,9 @@ interface ShapedBoxProps {
 }
 
 /**
- * Construit la section 2D (plan XZ) pour ExtrudeGeometry.
+ * Construit la section 2D (plan XZ) pour ExtrudeGeometry à partir du
+ * contour partagé (`getRoundedRectContourPoints`), utilisé aussi par
+ * RoofCell pour que la flèche/le parapet épousent le même contour.
  * Le plan Three.js pour l'extrusion est XY, donc on mappe :  X→X, Z→Y.
  * Le résultat est un Shape centré sur l'origine.
  */
@@ -41,52 +44,16 @@ function buildSection(
   hd: number,  // demi-profondeur (Z → Y dans le plan Shape)
   radii: CornerRadii,
 ): THREE.Shape {
-  // Coins dans l'ordre anti-horaire (vue du dessus, Y positif vers haut de l'écran)
-  const corners: Array<{
-    cx: number; cy: number; r: number; startAngle: number; cornerX: number; cornerY: number;
-  }> = [
-    { cx: -hw + radii.frontLeft, cy: -hd + radii.frontLeft, r: radii.frontLeft, startAngle: Math.PI, cornerX: -hw, cornerY: -hd },
-    { cx:  hw - radii.frontRight, cy: -hd + radii.frontRight, r: radii.frontRight, startAngle: Math.PI * 1.5, cornerX: hw, cornerY: -hd },
-    { cx:  hw - radii.backRight, cy:  hd - radii.backRight, r: radii.backRight, startAngle: 0, cornerX: hw, cornerY: hd },
-    { cx: -hw + radii.backLeft, cy:  hd - radii.backLeft, r: radii.backLeft, startAngle: Math.PI * 0.5, cornerX: -hw, cornerY: hd },
-  ];
+  const points = getRoundedRectContourPoints(hw, hd, radii, ARC_SEGS);
 
   const shape = new THREE.Shape();
-  let first = true;
-
-  for (const c of corners) {
-    const isRound = c.r > 0.001;
-
-    if (isRound) {
-      // Arc de quart de cercle utilisant le radius spécifique
-      const pts = arcPoints(c.cx, c.cy, c.r, c.startAngle, c.startAngle + Math.PI / 2, ARC_SEGS);
-      for (const [px, py] of pts) {
-        if (first) { shape.moveTo(px, py); first = false; }
-        else        { shape.lineTo(px, py); }
-      }
-    } else {
-      // Angle droit : on va directement au coin exact
-      if (first) { shape.moveTo(c.cornerX, c.cornerY); first = false; }
-      else        { shape.lineTo(c.cornerX, c.cornerY); }
-    }
-  }
+  points.forEach(([px, py], i) => {
+    if (i === 0) shape.moveTo(px, py);
+    else shape.lineTo(px, py);
+  });
 
   shape.closePath();
   return shape;
-}
-
-/** Points d'un arc (anti-horaire) */
-function arcPoints(
-  cx: number, cy: number, r: number,
-  startAngle: number, endAngle: number,
-  segs: number,
-): Array<[number, number]> {
-  const pts: Array<[number, number]> = [];
-  for (let i = 0; i <= segs; i++) {
-    const a = startAngle + (endAngle - startAngle) * (i / segs);
-    pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
-  }
-  return pts;
 }
 
 export function ShapedBox({

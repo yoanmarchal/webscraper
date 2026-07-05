@@ -1,8 +1,15 @@
 import * as THREE from 'three';
 import type { GridCell } from '../../types';
 import type { CellLookup } from '../../utils/cellUtils';
-import { getRoofConfig } from '../../utils/cellUtils';
+import {
+  getRoofConfig,
+  getCornerRadii,
+  scaleCornerRadii,
+  getRoundedRectContourPoints,
+  sampleContourPerimeter,
+} from '../../utils/cellUtils';
 import { shades } from '../../colorPalettes';
+import { ShapedBox } from '../ShapedBox';
 
 interface RoofCellProps {
   cell: GridCell;
@@ -114,51 +121,57 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
   };
 
   // ════════════════════════════════════════════════════════════════════════════
-  // CASE 1 — Isolated tower: round parapet + conical spire
+  // CASE 1 — Isolated tower: coiffe (couronnement + flèche) posée directement
+  // sur le mur, suivant le même contour que celui-ci.
   //
-  // Designed to sit flush on top of the cylindrical body below (r = 0.5).
-  // All elements are circular to match the tower shape.
+  // ⚠️ Pas de corps de parapet séparé : il était plus large que le corps du
+  // mur (WallWithWindowCell / StandardCell, hw=TOWER_R=0.5) et créait un
+  // décrochement visible. Tous les éléments (bandeau, merlons, flèche...)
+  // reposent donc directement sur le sommet du mur (BASE_Y = bord bas de la
+  // cellule de toit), sans espace vide entre les deux.
   // ════════════════════════════════════════════════════════════════════════════
   if (isIsolated) {
-    // Parapet : cylindre solide légèrement plus large que le corps (r=0.5)
-    // Il descend 0.05 sous la limite de la cellule pour chevaucher le corps en dessous.
-    const PARAPET_R     = TOWER_R + 0.04;   // overhang léger sur le cylindre
-    const PARAPET_Y_BOT = -0.55;            // -0.05 sous la limite → chevauche le corps
-    const PARAPET_Y_TOP = -0.10;
-    const PARAPET_H     = PARAPET_Y_TOP - PARAPET_Y_BOT;  // 0.45
-    const PARAPET_MID_Y = PARAPET_Y_BOT + PARAPET_H / 2;
+    const radii = getCornerRadii(lookup, cell);
 
-    // Merlons circulaires espacés régulièrement sur le bord du parapet
-    const MERLON_COUNT  = 6;
-    const MERLON_R      = 0.10;
-    const MERLON_H      = 0.28;
-    const MERLON_RING_R = TOWER_R;
-    const MERLON_Y      = PARAPET_Y_TOP + MERLON_H / 2;
+    // Référence de hauteur : sommet du mur en dessous (bord bas de la cellule
+    // de toit). Toutes les formules ci-dessous sont relatives à cette valeur,
+    // exactement comme avant quand elles étaient relatives au sommet du
+    // parapet — seul le parapet lui-même a été retiré.
+    const BASE_Y = -0.50;
 
-    // Flèche conique
-    const SPIRE_BASE_R  = TOWER_R - 0.06;
-    const SPIRE_H       = 1.10;
+    // Légère bavette/corniche en surplomb du mur (bandeau de couronnement).
+    const COPING_R    = TOWER_R + 0.06;
+    const CROWN_R     = COPING_R + 0.02;
+    const crownRadii  = scaleCornerRadii(radii, CROWN_R / TOWER_R);
+
+    // Merlons répartis sur le contour réel du mur (pas un cercle parfait)
+    const MERLON_COUNT   = 6;
+    const MERLON_R        = 0.10;
+    const MERLON_H        = 0.28;
+    const MERLON_Y        = BASE_Y + MERLON_H / 2;
+    const merlonContour   = getRoundedRectContourPoints(TOWER_R, TOWER_R, radii);
+
+    // Flèche : bague de base + tranches empilées qui se resserrent, suivant
+    // le même contour à chaque niveau — silhouette "carrée aux coins
+    // arrondis" qui se resserre au lieu d'un cône parfaitement rond.
+    const SPIRE_BASE_R   = TOWER_R - 0.06;
+    const SPIRE_H        = 1.10;
+    const SPIRE_RING_R   = SPIRE_BASE_R + 0.08;
+    const spireRingRadii = scaleCornerRadii(radii, SPIRE_RING_R / TOWER_R);
+    const SPIRE_SEGMENTS = 8;
 
     return (
       <group name="roofCell" position={position}>
 
-          {/* ── Corps du parapet (cylindre solide) ── */}
-          <mesh name="parapetBody" castShadow receiveShadow position={[0, PARAPET_MID_Y, 0]}>
-            <cylinderGeometry args={[PARAPET_R, PARAPET_R, PARAPET_H, 24]} />
-            <meshStandardMaterial color={roofColor} roughness={0.90} />
-          </mesh>
+          {/* ── Bandeau de couronnement (posé directement sur le mur) ── */}
+          <group name="crownBand" position={[0, BASE_Y + 0.02, 0]}>
+            <ShapedBox args={[CROWN_R * 2, 0.04, CROWN_R * 2]} radii={crownRadii}
+              isIsolated={isIsolated} color={colorDark} roughness={0.88} castShadow receiveShadow />
+          </group>
 
-          {/* ── Bandeau de couronnement ── */}
-          <mesh name="parapetCrownBand" castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.02, 0]}>
-            <cylinderGeometry args={[PARAPET_R + 0.02, PARAPET_R + 0.02, 0.04, 24]} />
-            <meshStandardMaterial color={colorDark} roughness={0.88} />
-          </mesh>
-
-          {/* ── Merlons ── */}
+          {/* ── Merlons (sur le contour réel du mur) ── */}
           {Array.from({ length: MERLON_COUNT }).map((_, i) => {
-            const angle = (i / MERLON_COUNT) * Math.PI * 2;
-            const mx = Math.cos(angle) * MERLON_RING_R;
-            const mz = Math.sin(angle) * MERLON_RING_R;
+            const { x: mx, z: mz } = sampleContourPerimeter(merlonContour, i / MERLON_COUNT);
             return (
               <mesh name={`merlon-${i}`} key={`merlon-${i}`} castShadow receiveShadow position={[mx, MERLON_Y, mz]}>
                 <cylinderGeometry args={[MERLON_R, MERLON_R * 1.1, MERLON_H, 10]} />
@@ -168,31 +181,42 @@ export function RoofCell({ cell, position, lookup, isIsolated }: RoofCellProps) 
           })}
 
           {/* ── Bague de base de flèche ── */}
-          <mesh name="spireBaseRing" castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.09, 0]}>
-            <cylinderGeometry args={[SPIRE_BASE_R + 0.04, SPIRE_BASE_R + 0.08, 0.10, 16]} />
-            <meshStandardMaterial color={colorDark} roughness={0.88} />
-          </mesh>
+          <group name="spireBaseRing" position={[0, BASE_Y + 0.09, 0]}>
+            <ShapedBox args={[SPIRE_RING_R * 2, 0.10, SPIRE_RING_R * 2]} radii={spireRingRadii}
+              isIsolated={isIsolated} color={colorDark} roughness={0.88} castShadow receiveShadow />
+          </group>
 
-          {/* ── Flèche conique ── */}
-          <mesh name="spireCone" castShadow receiveShadow position={[0, PARAPET_Y_TOP + 0.14 + SPIRE_H / 2, 0]}>
-            <coneGeometry args={[SPIRE_BASE_R, SPIRE_H, 16]} />
-            <meshStandardMaterial color={colorDark} roughness={0.82} />
-          </mesh>
+          {/* ── Flèche : tranches empilées qui se resserrent ── */}
+          {Array.from({ length: SPIRE_SEGMENTS }).map((_, i) => {
+            const t0 = i / SPIRE_SEGMENTS;
+            const t1 = (i + 1) / SPIRE_SEGMENTS;
+            const segH = SPIRE_H / SPIRE_SEGMENTS;
+            const rMid = Math.max(SPIRE_BASE_R * (1 - (t0 + t1) / 2), 0.02);
+            const segRadii = scaleCornerRadii(radii, rMid / TOWER_R);
+            const segY = BASE_Y + 0.14 + t0 * SPIRE_H + segH / 2;
+            return (
+              <group name={`spireSeg-${i}`} key={`spireSeg-${i}`} position={[0, segY, 0]}>
+                <ShapedBox args={[rMid * 2, segH, rMid * 2]} radii={segRadii}
+                  isIsolated={isIsolated} color={colorDark} roughness={0.82} castShadow receiveShadow />
+              </group>
+            );
+          })}
 
           {/* ── Anneaux de tuiles sur la flèche ── */}
           {[0.18, 0.36, 0.54, 0.72].map((t, i) => {
-            const bandR = SPIRE_BASE_R * (1 - t);
-            const bandY = PARAPET_Y_TOP + 0.14 + t * SPIRE_H;
+            const bandR = Math.max(SPIRE_BASE_R * (1 - t), 0.02) + 0.015;
+            const bandY = BASE_Y + 0.14 + t * SPIRE_H;
+            const bandRadii = scaleCornerRadii(radii, bandR / TOWER_R);
             return (
-              <mesh name={`spireBand-${i}`} key={`band-${i}`} castShadow position={[0, bandY, 0]}>
-                <cylinderGeometry args={[bandR + 0.015, bandR + 0.015, 0.03, 16]} />
-                <meshStandardMaterial color={roofColor} roughness={0.88} />
-              </mesh>
+              <group name={`band-${i}`} key={`band-${i}`} position={[0, bandY, 0]}>
+                <ShapedBox args={[bandR * 2, 0.03, bandR * 2]} radii={bandRadii}
+                  isIsolated={isIsolated} color={roofColor} roughness={0.88} castShadow={false} receiveShadow={false} />
+              </group>
             );
           })}
 
           {/* ── Épis doré ── */}
-          <mesh name="spireFinial" castShadow position={[0, PARAPET_Y_TOP + 0.14 + SPIRE_H + 0.06, 0]}>
+          <mesh name="spireFinial" castShadow position={[0, BASE_Y + 0.14 + SPIRE_H + 0.06, 0]}>
             <sphereGeometry args={[0.06, 12, 12]} />
             <meshStandardMaterial color="#d4a04f" metalness={0.75} roughness={0.15} />
           </mesh>
