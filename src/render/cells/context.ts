@@ -1,0 +1,22 @@
+/**
+ * CellContext — tout ce qu'un builder de cellule a besoin de savoir sur ses
+ * voisins, calculé UNE seule fois par cellule dans buildVillage.ts.
+ * (Avant : chaque cell component recalculait getExposedFaces/getCornerRadii,
+ * parfois plusieurs fois.)
+ */
+
+import type { GridCell } from '../../types';
+import type { CellFace, CellLookup, CornerRadii } from '../../utils/cellUtils';
+
+export interface CellContext {
+  cell: GridCell;
+  lookup: CellLookup;
+  exposedFaces: CellFace[];
+  radii: CornerRadii;
+  /**
+   * Murs/fondations : `isTowerColumn` (propagation vers le bas, intentionnelle).
+   * Toits : `isIsolatedBlock` (non propagé). Cette asymétrie est délibérée —
+   * voir AGENTS.md.
+   */
+  isIsolated: boolean;
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { VillageGrid } from './villageGrid';
 import { VoxelScene } from './components/VoxelScene';
 import { ControlPanel } from './components/ControlPanel';
@@ -6,7 +6,7 @@ import { ControlPanel } from './components/ControlPanel';
 const GRID_HEIGHT = 10;
 
 export function App() {
-  const [, setRenderTick] = useState(0);
+  const [renderTick, setRenderTick] = useState(0);
   const [previewCell, setPreviewCell] = useState<{ x: number; z: number } | null>(null);
   const [gridSize, setGridSize] = useState(2);
   const [showPerfMonitor, setShowPerfMonitor] = useState(false);
@@ -35,7 +35,14 @@ export function App() {
     refreshScene();
   };
 
-  const cells = grid.getOccupiedCells();
+  // ⚡ Références stables : le merge statique (VillageMeshes) ne doit être
+  // reconstruit que lorsque la grille change réellement (renderTick), pas à
+  // chaque re-render de App (ex: survol souris → previewCell).
+  const cells = useMemo(() => grid.getOccupiedCells(), [grid, renderTick]);
+  const toWorldPosition = useCallback(
+    (x: number, y: number, z: number) => grid.toWorldPosition(x, y, z),
+    [grid],
+  );
 
   return (
     <div className="app-shell compact-shell">
@@ -87,7 +94,7 @@ export function App() {
             }
           }}
           previewCell={previewCell}
-          toWorldPosition={(x, y, z) => grid.toWorldPosition(x, y, z)}
+          toWorldPosition={toWorldPosition}
           getNextPlacementY={(x, z, minimumY) => grid.getNextPlacementY(x, z, minimumY)}
           getTopOccupiedY={(x, z) => grid.getTopOccupiedY(x, z)}
           gridSize={gridSize}

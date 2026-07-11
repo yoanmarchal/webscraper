@@ -182,6 +182,26 @@ export function getExposedFaces(lookup: CellLookup, cell: GridCell): Array<CellF
   return faces;
 }
 
+/**
+ * Un coin (dx, dz) ∈ {±1}² est "exposé" si l'un des deux voisins adjacents
+ * ou le voisin diagonal est absent. Logique partagée entre le rendu des
+ * quoins et la protection des stone patches (elle était dupliquée avant).
+ */
+export function isCornerExposed(lookup: CellLookup, cell: GridCell, dx: number, dz: number): boolean {
+  const adj1 = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z);
+  const adj2 = hasOccupiedCell(lookup, cell.x, cell.y, cell.z + dz);
+  const diag = hasOccupiedCell(lookup, cell.x + dx, cell.y, cell.z + dz);
+  return !(adj1 && adj2 && diag);
+}
+
+/** Les 4 coins d'une cellule, avec leur nom canonique. */
+export const CELL_CORNERS: ReadonlyArray<{ dx: -1 | 1; dz: -1 | 1; corner: 'backLeft' | 'backRight' | 'frontLeft' | 'frontRight' }> = [
+  { dx: -1, dz: -1, corner: 'backLeft' },
+  { dx: 1, dz: -1, corner: 'backRight' },
+  { dx: -1, dz: 1, corner: 'frontLeft' },
+  { dx: 1, dz: 1, corner: 'frontRight' },
+];
+
 // Détecte si un bloc est isolé (aucun voisin horizontal)
 export function isIsolatedBlock(lookup: CellLookup, cell: GridCell): boolean {
   return !hasOccupiedCell(lookup, cell.x - 1, cell.y, cell.z) &&
@@ -239,7 +259,10 @@ export function projectOnFace(
   if (t > 0 && radiusPos > 0.001) {
     const flatLimit = 0.5 - radiusPos;
     if (t > flatLimit) {
-      const dx = t - flatLimit; // 0 to radiusPos
+      // ⚠️ Clamp : t peut légèrement dépasser le bord de la face (alignement
+      // en grille des pierres) → sans clamp, asin(>1) = NaN qui corrompait
+      // toute la géométrie fusionnée.
+      const dx = Math.min(t - flatLimit, radiusPos); // 0 to radiusPos
       const dz = Math.sqrt(Math.max(0, radiusPos * radiusPos - dx * dx));
       const theta = Math.asin(dx / radiusPos);
       return {
@@ -250,7 +273,7 @@ export function projectOnFace(
   } else if (t < 0 && radiusNeg > 0.001) {
     const flatLimit = -0.5 + radiusNeg;
     if (t < flatLimit) {
-      const dx = flatLimit - t; // positive, 0 to radiusNeg
+      const dx = Math.min(flatLimit - t, radiusNeg); // positive, 0 to radiusNeg
       const dz = Math.sqrt(Math.max(0, radiusNeg * radiusNeg - dx * dx));
       const theta = Math.asin(dx / radiusNeg);
       return {

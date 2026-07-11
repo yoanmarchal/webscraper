@@ -1,12 +1,9 @@
 import { OrbitControls, Sky } from '@react-three/drei';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import type { GridCell } from '../types';
-import { makeCellLookup } from '../utils/cellUtils';
-import { CellMesh } from './CellMesh';
+import { VillageMeshes } from './VillageMeshes';
 import { PlacementPreview } from './PlacementPreview';
-import { Bloom, EffectComposer, Noise, Vignette, SSAO   } from '@react-three/postprocessing'
-import { DotScreen } from '@react-three/postprocessing'
-import { BlendFunction } from 'postprocessing'
+import { Bloom, EffectComposer, Noise, Vignette } from '@react-three/postprocessing'
 import { Perf } from 'r3f-perf';
 
 interface VoxelSceneProps {
@@ -60,7 +57,7 @@ export function VoxelScene({
 
   return (
     <Canvas
-      shadows
+      shadows="percentage"
       camera={{ position: [10, 12, 14], fov: 45, near: 0.1, far: 100 }}
       gl={{ antialias: true }}
       onContextMenu={(event) => event.preventDefault()}
@@ -85,12 +82,7 @@ export function VoxelScene({
           <planeGeometry args={[gridWidth, gridDepth]} />
         <meshStandardMaterial color="#f5e6d3" transparent opacity={0.95} roughness={0.95} />
       </mesh>
-      {(() => {
-        const lookup = makeCellLookup(cells);
-        return cells.map((cell) => (
-          <CellMesh key={`${cell.x}-${cell.y}-${cell.z}`} cell={cell} toWorldPosition={(x, y, z) => toWorldPosition(x, y, z)} lookup={lookup} />
-        ));
-      })()}
+      <VillageMeshes cells={cells} toWorldPosition={toWorldPosition} />
       <PlacementPreview
         previewCell={previewCell}
         toWorldPosition={toWorldPosition}
@@ -102,11 +94,6 @@ export function VoxelScene({
         <Noise opacity={0.02} />
         <Vignette eskil={false} offset={0.1} darkness={0.5} />
       </EffectComposer>
-  <DotScreen
-    blendFunction={BlendFunction.NORMAL} // blend mode
-    angle={Math.PI * 0.5} // angle of the dot pattern
-    scale={1.0} // scale of the dot pattern
-  />
     </Canvas>
   );
 }

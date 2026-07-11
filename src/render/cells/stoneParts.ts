@@ -1,15 +1,17 @@
-import { RoundedBox } from '@react-three/drei';
-import { projectOnFace } from './cellUtils';
-import { JSX } from 'react/jsx-runtime';
+/**
+ * Pierres apparentes — ex-stonePatches.tsx, porté en builder de parts.
+ *
+ * Centralise UNIQUEMENT la géométrie/le placement. La logique de zone
+ * protégée reste fournie par l'appelant via `isInProtectedZone`, afin de ne
+ * jamais affaiblir la sécurité de l'un en la fusionnant avec l'autre
+ * (voir AGENTS.md). Types `CellFace`/`CornerRadii` désormais uniques,
+ * importés de cellUtils (ils étaient dupliqués ici).
+ */
 
-export type CellFace = 'front' | 'back' | 'left' | 'right';
-
-export interface CornerRadii {
-  backLeft: number;
-  backRight: number;
-  frontLeft: number;
-  frontRight: number;
-}
+import type { CellFace, CornerRadii } from '../../utils/cellUtils';
+import { projectOnFace } from '../../utils/cellUtils';
+import { roundedBoxGeo } from '../geometryCache';
+import { part, xform, type Part } from '../parts';
 
 export interface StoneSeedSalt {
   x: number;
@@ -54,23 +56,16 @@ export interface StonePatchesConfig {
   radii: CornerRadii;
   /**
    * 'numeric' (par défaut) transmet le radius réel à projectOnFace.
-   * 'boolean' le convertit en simple flag "coin arrondi ?" — utile si
-   * seul l'angle (et non son amplitude) doit influencer la projection.
+   * 'boolean' le convertit en simple flag "coin arrondi ?".
    */
   cornerMode?: 'numeric' | 'boolean';
-  /** Rayon du cylindre utilisé pour la projection en mode tour isolée */
-  towerRadius: number;
   /** Décalage fixe ajouté à la profondeur de surface sur un mur plat */
   wallSurfaceOffset: number;
 
-  /**
-   * 🔢 Nombre de pierres par face exposée.
-   * C'est LE paramètre à modifier pour ajuster facilement la densité de
-   * pierres. Par défaut : 3 + (|x*3 + z*7| % 3), soit 3 à 5 pierres.
-   */
+  /** 🔢 Nombre de pierres par face exposée. */
   stonesPerFace?: number | ((cell: { x: number; y: number; z: number }, faceIdx: number) => number);
 
-  /** Sels de hash déterministe (laisser les valeurs par défaut sauf besoin spécifique) */
+  /** Sels de hash déterministe */
   seedSalt?: StoneSeedSalt;
 
   /** Taille de base des pierres avant variation */
@@ -84,11 +79,9 @@ export interface StonePatchesConfig {
   visual: StoneVisual;
 
   /**
-   * 🔒 Sécurité : zone(s) protégée(s) — fenêtres, portes, quoins, bandes
-   * déco, etc. Chaque appelant fournit SA propre logique métier ; une
-   * pierre n'est jamais placée si cette fonction renvoie true. Ne JAMAIS
-   * mutualiser cette fonction entre composants : leurs zones protégées
-   * ne sont pas équivalentes.
+   * 🔒 Sécurité : zone(s) protégée(s) — fenêtres, portes, quoins, bandes...
+   * Chaque appelant fournit SA propre logique métier. Ne JAMAIS mutualiser
+   * cette fonction entre composants.
    */
   isInProtectedZone: (face: CellFace, x: number, y: number, stoneWidth: number, stoneHeight: number) => boolean;
 }
@@ -107,12 +100,9 @@ function defaultStonesPerFace(cell: { x: number; z: number }): number {
   return 3 + (Math.abs(cell.x * 3 + cell.z * 7) % 3);
 }
 
-function getFaceCorners(
-  face: CellFace,
-  radii: CornerRadii,
-  cornerMode: 'numeric' | 'boolean'
-): [number | boolean, number | boolean] {
-  const toVal = (r: number) => (cornerMode === 'boolean' ? r > 0.01 : r);
+function getFaceCorners(face: CellFace, radii: CornerRadii, cornerMode: 'numeric' | 'boolean'): [number, number] {
+  // En mode 'boolean', on écrase le radius en 0/EDGE-like flag numérique
+  const toVal = (r: number) => (cornerMode === 'boolean' ? (r > 0.01 ? r : 0) : r);
   switch (face) {
     case 'front':
       return [toVal(radii.frontLeft), toVal(radii.frontRight)];
@@ -126,21 +116,16 @@ function getFaceCorners(
 }
 
 /**
- * Génère les pierres apparentes (decoration STONE) communes à StandardCell
- * et WallWithWindowCell, pour une tour cylindrique isolée ou un mur plat.
- *
- * Centralise UNIQUEMENT la géométrie/le placement. La logique de zone
- * protégée reste fournie par l'appelant via `isInProtectedZone`, afin de ne
- * jamais affaiblir la sécurité de l'un en la fusionnant avec l'autre.
+ * Génère les parts des pierres apparentes communes à StandardCell et
+ * WallWithWindowCell, pour une tour cylindrique isolée ou un mur plat.
  */
-export function renderStonePatches(config: StonePatchesConfig) {
+export function stoneParts(config: StonePatchesConfig): Part[] {
   const {
     cell,
     exposedFaces,
     isIsolated,
     radii,
     cornerMode = 'numeric',
-    towerRadius,
     wallSurfaceOffset,
     stonesPerFace,
     seedSalt = DEFAULT_SEED_SALT,
@@ -151,9 +136,12 @@ export function renderStonePatches(config: StonePatchesConfig) {
     isInProtectedZone,
   } = config;
 
-  if (exposedFaces.length === 0) return null;
+  if (exposedFaces.length === 0) return [];
 
-  const stones: JSX.Element[] = [];
+  const metalness = isIsolated ? visual.metalnessIsolated ?? visual.metalness ?? 0 : visual.metalness ?? 0;
+  const mat = { roughness: visual.roughness ?? 0.9, metalness };
+
+  const parts: Part[] = [];
 
   exposedFaces.forEach((face, faceIdx) => {
     const count =
@@ -169,7 +157,7 @@ export function renderStonePatches(config: StonePatchesConfig) {
           cell.y * seedSalt.y +
           cell.z * seedSalt.z +
           faceIdx * seedSalt.face +
-          i * seedSalt.stone
+          i * seedSalt.stone,
       );
       const h1 = seed % 100;
       const h2 = (seed * 7 + 13) % 100;
@@ -179,25 +167,23 @@ export function renderStonePatches(config: StonePatchesConfig) {
         ? computeSize(h1, h2, h3, baseSize)
         : defaultComputeSize(h1, h2, h3, baseSize);
 
-      // Position dans les quadrants pour les 4 premiers, puis aléatoire (basé sur le hash)
+      // Position dans les quadrants pour les 4 premières, puis basé sur le hash
       const quadrant = i % 4;
-      const signX = i < 4 ? (quadrant === 0 || quadrant === 2 ? -1 : 1) : (h1 % 2 === 0 ? -1 : 1);
-      const signY = i < 4 ? (quadrant === 0 || quadrant === 1 ? -1 : 1) : (h2 % 2 === 0 ? -1 : 1);
-      const distX = distance.xBase + (h1 % distance.xModRange) * 0.01;
-      const distY = distance.yBase + (h2 % distance.yModRange) * 0.01;
-      const rawOffsetX = signX * distX;
-      const rawOffsetY = signY * distY;
+      const signX = i < 4 ? (quadrant === 0 || quadrant === 2 ? -1 : 1) : h1 % 2 === 0 ? -1 : 1;
+      const signY = i < 4 ? (quadrant === 0 || quadrant === 1 ? -1 : 1) : h2 % 2 === 0 ? -1 : 1;
+      const rawOffsetX = signX * (distance.xBase + (h1 % distance.xModRange) * 0.01);
+      const rawOffsetY = signY * (distance.yBase + (h2 % distance.yModRange) * 0.01);
 
       // Alignement sur une grille (appareillage en quinconce)
       const rowHeight = baseSize.height * 1.25;
       const colWidth = baseSize.width * 1.15;
-      
+
       const rowIndex = Math.round(rawOffsetY / rowHeight);
       const offsetY = rowIndex * rowHeight;
-      
+
       const isEvenRow = Math.abs(rowIndex) % 2 === 0;
       const rowOffsetX = isEvenRow ? 0 : colWidth / 2;
-      
+
       const colIndex = Math.round((rawOffsetX - rowOffsetX) / colWidth);
       const offsetX = colIndex * colWidth + rowOffsetX;
 
@@ -205,67 +191,50 @@ export function renderStonePatches(config: StonePatchesConfig) {
       const isOverlapping = placedStones.some(
         (stone) =>
           Math.abs(offsetX - stone.x) < (w + stone.w) / 2 + 0.01 &&
-          Math.abs(offsetY - stone.y) < (h + stone.h) / 2 + 0.01
+          Math.abs(offsetY - stone.y) < (h + stone.h) / 2 + 0.01,
       );
-      if (isOverlapping) {
-        continue;
-      }
+      if (isOverlapping) continue;
 
       // 🔒 Sécurité : ne jamais placer une pierre dans une zone protégée
-      if (isInProtectedZone(face, offsetX, offsetY, w, h)) {
-        continue;
-      }
+      if (isInProtectedZone(face, offsetX, offsetY, w, h)) continue;
 
       placedStones.push({ x: offsetX, y: offsetY, w, h });
 
-      const key = `stone-${face}-${faceIdx}-${i}`;
-
       // ── Projection sur la surface réelle (mur plat ou arrondi) ────────
-      // Utilise projectOnFace avec les radii réels pour épouser la courbure
       const [crNeg, crPos] = getFaceCorners(face, radii, cornerMode);
-      let pos: [number, number, number] = [0, 0, 0];
-      let rot: [number, number, number] = [0, 0, 0];
+      const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg, crPos);
 
+      let pos: [number, number, number];
+      let rot: [number, number, number];
       switch (face) {
-        case 'front': {
-          const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
+        case 'front':
           pos = [offsetX, offsetY, surfaceZ + wallSurfaceOffset];
           rot = [0, rotY, 0];
           break;
-        }
-        case 'back': {
-          const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
+        case 'back':
           pos = [offsetX, offsetY, -(surfaceZ + wallSurfaceOffset)];
           rot = [0, Math.PI - rotY, 0];
           break;
-        }
-        case 'left': {
-          const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
+        case 'left':
           pos = [-(surfaceZ + wallSurfaceOffset), offsetY, offsetX];
           rot = [0, Math.PI / 2 + rotY, 0];
           break;
-        }
-        case 'right': {
-          const { surfaceZ, rotY } = projectOnFace(offsetX, crNeg as never, crPos as never);
+        case 'right':
           pos = [surfaceZ + wallSurfaceOffset, offsetY, offsetX];
           rot = [0, -(Math.PI / 2 + rotY), 0];
           break;
-        }
       }
 
-      stones.push(
-        <mesh key={key} name={`stonePatch-${face}-${i}`} position={pos} rotation={rot} castShadow receiveShadow>
-          <RoundedBox args={[w, h, visual.thickness]} radius={visual.cornerRadius} smoothness={visual.smoothness ?? 2}>
-            <meshStandardMaterial
-              color={visual.color}
-              roughness={visual.roughness ?? 0.9}
-              metalness={visual.metalness ?? 0}
-            />
-          </RoundedBox>
-        </mesh>
+      parts.push(
+        part(
+          roundedBoxGeo(w, h, visual.thickness, visual.cornerRadius, visual.smoothness ?? 2),
+          visual.color,
+          mat,
+          xform(pos, rot),
+        ),
       );
     }
   });
 
-  return <>{stones}</>;
+  return parts;
 }
